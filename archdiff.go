@@ -36,7 +36,7 @@ type Glob interface {
 }
 
 type realGlob string
-type prefixGlob string
+type simpleGlob string
 
 type ArchDiff struct {
 	Silent     bool
@@ -102,8 +102,11 @@ func (g realGlob) Match(path string) bool {
 	return matched
 }
 
-func (g prefixGlob) Match(path string) bool {
-	return strings.HasPrefix(path, string(g))
+func (g simpleGlob) Match(path string) bool {
+  if path == string(g) {
+    return true
+  }
+  return strings.HasPrefix(path, string(g) + "/")
 }
 
 func filehash(path string) (string, error) {
@@ -153,7 +156,7 @@ func (ad *ArchDiff) IgnoreGlob() []Glob {
 				if strings.IndexAny(l, "*?[") > -1 {
 					ad.ignoreGlob = append(ad.ignoreGlob, realGlob(l))
 				} else {
-					ad.ignoreGlob = append(ad.ignoreGlob, prefixGlob(l))
+					ad.ignoreGlob = append(ad.ignoreGlob, simpleGlob(l))
 				}
 			}
 		}
