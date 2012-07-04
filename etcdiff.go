@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/md5"
 	"flag"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 )
 
@@ -16,6 +18,7 @@ var (
 	root    = flag.String("root", "/", "set an alternate installation root")
 	dbpath  = flag.String(
 		"dbpath", "/var/lib/pacman", "set an alternate database location")
+	repo = flag.String("repo", safewd(), "repo directory")
 
 	ignoreGlobs = []string{
 		"/etc/group",
@@ -33,9 +36,14 @@ var (
 		"/etc/rndc.key",
 		"/etc/shadow-",
 		"/etc/ssh/ssh_host_*key*",
-		"/etc/ssl/certs/*",
+		"/etc/ssl/certs/*", /**/
 	}
 )
+
+func safewd() string {
+	wd, _ := os.Getwd()
+	return wd
+}
 
 func ignore(path string) bool {
 	for _, glob := range ignoreGlobs {
@@ -144,7 +152,29 @@ func unpackaged(packaged []alpm.File) (list []string, err error) {
 	return
 }
 
+func repoFiles() (lines []string, err error) {
+	cmd := exec.Command("git", "ls-files")
+	cmd.Dir = *repo
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	buf := bytes.NewBuffer(out)
+	for {
+		line, err := buf.ReadString('\n')
+		if err != nil {
+			if err == io.EOF {
+				return lines, nil
+			}
+			return nil, err
+		}
+		lines = append(lines, line[:len(line)-1]) // drop trailing newline
+	}
+	return
+}
+
 func main() {
+	flag.Parse()
 	handle, err := alpm.Init(*root, *dbpath)
 	if err != nil {
 		log.Fatalf("Failed to initialize pacman: %s", err)
@@ -172,4 +202,10 @@ func main() {
 		log.Fatalf("Error finding unpackaged files: %s", err)
 	}
 	log.Printf("%+v", unpackagedFiles)
+
+	repoFiles, err := repoFiles()
+	if err != nil {
+		log.Fatalf("Error finding repo files: %s", err)
+	}
+	log.Printf("%+v", repoFiles)
 }
