@@ -16,7 +16,39 @@ var (
 	root    = flag.String("root", "/", "set an alternate installation root")
 	dbpath  = flag.String(
 		"dbpath", "/var/lib/pacman", "set an alternate database location")
+
+	ignoreGlobs = []string{
+		"/etc/group",
+		"/etc/gshadow",
+		"/etc/passwd",
+		"/etc/shadow",
+		"/etc/shells",
+		"/etc/.pwd.lock",
+		"/etc/group-",
+		"/etc/gshadow-",
+		"/etc/ld.so.cache",
+		"/etc/pacman.d/gnupg/*",
+		"/etc/passwd-",
+		"/etc/profile.d/locale.sh",
+		"/etc/rndc.key",
+		"/etc/shadow-",
+		"/etc/ssh/ssh_host_*key*",
+		"/etc/ssl/certs/*",
+	}
 )
+
+func ignore(path string) bool {
+	for _, glob := range ignoreGlobs {
+		matched, err := filepath.Match(glob, path)
+		if err != nil {
+			log.Fatalf("Match error: %s", err)
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
+}
 
 func filehash(path string) (string, error) {
 	file, err := os.Open(path)
@@ -57,7 +89,11 @@ func files(h *alpm.Handle) (files []alpm.File, err error) {
 
 func modified(files []alpm.BackupFile) (list []alpm.BackupFile, err error) {
 	for _, file := range files {
-		actual, err := filehash(filepath.Join(*root, file.Name))
+		fullname := filepath.Join(*root, file.Name)
+		if ignore(fullname) {
+			continue
+		}
+		actual, err := filehash(fullname)
 		if err != nil {
 			if os.IsPermission(err) {
 				log.Printf("Skipping file due to permission errors: %s\n", err)
@@ -86,6 +122,9 @@ func unpackaged(packaged []alpm.File) (list []string, err error) {
 	err = filepath.Walk(
 		filepath.Join(*root, "etc"),
 		func(path string, info os.FileInfo, err error) error {
+			if ignore(path) {
+				return nil
+			}
 			if info.IsDir() {
 				return nil
 			}
@@ -116,7 +155,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to retrieve backups list: %s", err)
 	}
-	log.Printf("%+v", backupFiles)
 
 	allFiles, err := files(handle)
 	if err != nil {
