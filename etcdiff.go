@@ -29,24 +29,36 @@ func filehash(path string) (string, error) {
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
 
-func modified(h *alpm.Handle) ([]string, error) {
+func backups(h *alpm.Handle) (files []alpm.BackupFile, err error) {
 	db, err := h.LocalDb()
 	if err != nil {
 		return nil, err
 	}
-	db.PkgCache().ForEach(func(pkg alpm.Package) error {
-		for _, file := range pkg.Backup().Slice() {
-			actual, err := filehash(filepath.Join(*root, file.Name))
-			if err != nil {
-				fmt.Printf("Error calculating actual hash: %s\n", err)
-			}
-			if actual != file.Hash {
-				fmt.Printf("Different hash: %s %s %s\n", pkg.Name(), file, actual)
+	err = db.PkgCache().ForEach(func(pkg alpm.Package) error {
+		return pkg.Backup().ForEach(func(bf alpm.BackupFile) error {
+			files = append(files, bf)
+			return nil
+		})
+	})
+	return
+}
+
+func modified(files []alpm.BackupFile) (l []alpm.BackupFile, err error) {
+	for _, file := range files {
+		actual, err := filehash(filepath.Join(*root, file.Name))
+		if err != nil {
+			if os.IsPermission(err) {
+				log.Printf("Skipping file due to permission errors: %s\n", err)
+				continue
+			} else {
+				return nil, fmt.Errorf("Error calculating actual hash: %s", err)
 			}
 		}
-		return nil
-	})
-	return nil, nil
+		if actual != file.Hash {
+			l = append(l, file)
+		}
+	}
+	return
 }
 
 func main() {
@@ -56,5 +68,15 @@ func main() {
 	}
 	defer handle.Release()
 
-	log.Println(modified(handle))
+	backupFiles, err := backups(handle)
+	if err != nil {
+		log.Fatalf("Failed to retrieve backups list: %s", err)
+	}
+	log.Println(backupFiles)
+
+	modifiedFiles, err := modified(backupFiles)
+	if err != nil {
+		log.Fatalf("Error finding modified files: %s", err)
+	}
+	log.Printf("%+v", modifiedFiles)
 }
