@@ -5,6 +5,7 @@ import (
 	"crypto/md5"
 	"flag"
 	"fmt"
+	"github.com/nshah/go.flagconfig"
 	"github.com/remyoudompheng/go-alpm"
 	"io"
 	"log"
@@ -175,6 +176,7 @@ func repoFiles() (lines []string, err error) {
 
 func main() {
 	flag.Parse()
+	flagconfig.Parse()
 	handle, err := alpm.Init(*root, *dbpath)
 	if err != nil {
 		log.Fatalf("Failed to initialize pacman: %s", err)
