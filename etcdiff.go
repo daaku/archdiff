@@ -28,6 +28,7 @@ type EtcDiff struct {
 	allPackageFile     []alpm.File
 	unpackagedFile     []string
 	repoFile           []string
+	modifiedRepoFile   []string
 }
 
 func filehash(path string) (string, error) {
@@ -186,6 +187,35 @@ func (e *EtcDiff) RepoFile() []string {
 	return e.repoFile
 }
 
+func (e *EtcDiff) ModifiedRepoFile() []string {
+	if e.modifiedRepoFile == nil {
+		for _, file := range e.RepoFile() {
+			realpath := filepath.Join(e.Root, "etc", file)
+			repopath := filepath.Join(e.Repo, file)
+			realhash, err := filehash(realpath)
+			if err != nil && !os.IsNotExist(err) {
+				if os.IsPermission(err) {
+					log.Printf("Skipping file: %s", err)
+					continue
+				}
+				log.Fatalf("Error looking for modified repo files (real): %s", err)
+			}
+			repohash, err := filehash(repopath)
+			if err != nil && !os.IsNotExist(err) {
+				if os.IsPermission(err) {
+					log.Printf("Skipping file: %s", err)
+					continue
+				}
+				log.Fatalf("Error looking for modified repo files (repo): %s", err)
+			}
+			if realhash != repohash {
+				e.modifiedRepoFile = append(e.modifiedRepoFile, file)
+			}
+		}
+	}
+	return e.modifiedRepoFile
+}
+
 func main() {
 	e := &EtcDiff{}
 	flag.BoolVar(&e.Verbose, "verbose", false, "verbose")
@@ -215,7 +245,5 @@ func main() {
 	flag.Parse()
 	flagconfig.Parse()
 
-	log.Printf("%+v", e.ModifiedBackupFile())
-	log.Printf("%+v", e.UnpackagedFile())
-	log.Printf("%+v", e.RepoFile())
+	log.Printf("%+v", e.ModifiedRepoFile())
 }
