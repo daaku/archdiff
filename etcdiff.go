@@ -14,6 +14,11 @@ import (
 	"path/filepath"
 )
 
+type File struct {
+	Name string
+	Hash string
+}
+
 type EtcDiff struct {
 	Verbose     bool
 	Root        string
@@ -21,14 +26,15 @@ type EtcDiff struct {
 	Repo        string
 	IgnoreGlobs []string
 
-	backupFile         []alpm.BackupFile
-	modifiedBackupFile []alpm.BackupFile
+	backupFile         []File
+	modifiedBackupFile []File
 	localDb            *alpm.Db
 	alpmHandle         *alpm.Handle
-	allPackageFile     []alpm.File
-	unpackagedFile     []string
-	repoFile           []string
-	modifiedRepoFile   []string
+	allPackageFile     []File
+	unpackagedFile     []File
+	repoFile           []File
+	modifiedRepoFile   []File
+	missingInRepo      []File
 }
 
 func filehash(path string) (string, error) {
@@ -42,9 +48,9 @@ func filehash(path string) (string, error) {
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
 
-func inList(path string, list []alpm.File) bool {
+func contains(name string, list []File) bool {
 	for _, file := range list {
-		if file.Name == path {
+		if file.Name == name {
 			return true
 		}
 	}
@@ -92,11 +98,11 @@ func (e *EtcDiff) LocalDb() *alpm.Db {
 	return e.localDb
 }
 
-func (e *EtcDiff) BackupFile() []alpm.BackupFile {
+func (e *EtcDiff) BackupFile() []File {
 	if e.backupFile == nil {
 		e.LocalDb().PkgCache().ForEach(func(pkg alpm.Package) error {
 			return pkg.Backup().ForEach(func(bf alpm.BackupFile) error {
-				e.backupFile = append(e.backupFile, bf)
+				e.backupFile = append(e.backupFile, File{Name: bf.Name, Hash: bf.Hash})
 				return nil
 			})
 		})
@@ -104,17 +110,19 @@ func (e *EtcDiff) BackupFile() []alpm.BackupFile {
 	return e.backupFile
 }
 
-func (e *EtcDiff) AllPackageFile() []alpm.File {
+func (e *EtcDiff) AllPackageFile() []File {
 	if e.allPackageFile == nil {
 		e.LocalDb().PkgCache().ForEach(func(pkg alpm.Package) error {
-			e.allPackageFile = append(e.allPackageFile, pkg.Files()...)
+			for _, file := range pkg.Files() {
+				e.allPackageFile = append(e.allPackageFile, File{Name: file.Name})
+			}
 			return nil
 		})
 	}
 	return e.allPackageFile
 }
 
-func (e *EtcDiff) ModifiedBackupFile() []alpm.BackupFile {
+func (e *EtcDiff) ModifiedBackupFile() []File {
 	if e.modifiedBackupFile == nil {
 		for _, file := range e.BackupFile() {
 			fullname := filepath.Join(e.Root, file.Name)
@@ -137,7 +145,7 @@ func (e *EtcDiff) ModifiedBackupFile() []alpm.BackupFile {
 	return e.modifiedBackupFile
 }
 
-func (e *EtcDiff) UnpackagedFile() []string {
+func (e *EtcDiff) UnpackagedFile() []File {
 	if e.unpackagedFile == nil {
 		filepath.Walk(
 			filepath.Join(e.Root, "etc"),
@@ -155,8 +163,8 @@ func (e *EtcDiff) UnpackagedFile() []string {
 					}
 					log.Fatalf("Error finding unpackaged file: %s", err)
 				}
-				if !inList(path[1:], e.AllPackageFile()) {
-					e.unpackagedFile = append(e.unpackagedFile, path[1:])
+				if !contains(path[1:], e.AllPackageFile()) {
+					e.unpackagedFile = append(e.unpackagedFile, File{Name: path[1:]})
 				}
 				return nil
 			})
@@ -164,7 +172,7 @@ func (e *EtcDiff) UnpackagedFile() []string {
 	return e.unpackagedFile
 }
 
-func (e *EtcDiff) RepoFile() []string {
+func (e *EtcDiff) RepoFile() []File {
 	if e.repoFile == nil {
 		cmd := exec.Command("git", "ls-files")
 		cmd.Dir = e.Repo
@@ -181,17 +189,18 @@ func (e *EtcDiff) RepoFile() []string {
 				}
 				log.Fatalf("Error parsing repo listing: %s", err)
 			}
-			e.repoFile = append(e.repoFile, line[:len(line)-1]) // drop trailing \n
+			e.repoFile = append(
+				e.repoFile, File{Name: line[:len(line)-1]}) // drop trailing \n
 		}
 	}
 	return e.repoFile
 }
 
-func (e *EtcDiff) ModifiedRepoFile() []string {
+func (e *EtcDiff) ModifiedRepoFile() []File {
 	if e.modifiedRepoFile == nil {
 		for _, file := range e.RepoFile() {
-			realpath := filepath.Join(e.Root, "etc", file)
-			repopath := filepath.Join(e.Repo, file)
+			realpath := filepath.Join(e.Root, file.Name)
+			repopath := filepath.Join(e.Repo, file.Name)
 			realhash, err := filehash(realpath)
 			if err != nil && !os.IsNotExist(err) {
 				if os.IsPermission(err) {
@@ -214,6 +223,22 @@ func (e *EtcDiff) ModifiedRepoFile() []string {
 		}
 	}
 	return e.modifiedRepoFile
+}
+
+func (e *EtcDiff) MissingInRepo() []File {
+	if e.missingInRepo == nil {
+		for _, file := range e.ModifiedBackupFile() {
+			if !contains(file.Name, e.RepoFile()) {
+				e.missingInRepo = append(e.missingInRepo, file)
+			}
+		}
+		for _, file := range e.UnpackagedFile() {
+			if !contains(file.Name, e.RepoFile()) {
+				e.missingInRepo = append(e.missingInRepo, file)
+			}
+		}
+	}
+	return e.missingInRepo
 }
 
 func main() {
@@ -245,5 +270,7 @@ func main() {
 	flag.Parse()
 	flagconfig.Parse()
 
+	log.Printf("%+v", e.UnpackagedFile())
 	log.Printf("%+v", e.ModifiedRepoFile())
+	log.Printf("%+v", e.MissingInRepo())
 }
