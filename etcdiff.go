@@ -123,7 +123,7 @@ func (e *EtcDiff) ModifiedBackupFile() []alpm.BackupFile {
 			actual, err := filehash(fullname)
 			if err != nil {
 				if os.IsPermission(err) {
-					log.Printf("Skipping file due to permission errors: %s\n", err)
+					log.Printf("Skipping file: %s\n", err)
 					continue
 				}
 				log.Fatalf("Error calculating actual hash: %s", err)
@@ -149,7 +149,7 @@ func (e *EtcDiff) UnpackagedFile() []string {
 				}
 				if err != nil {
 					if os.IsPermission(err) {
-						log.Printf("Skipping file due to permission errors: %s", err)
+						log.Printf("Skipping file: %s", err)
 						return nil
 					}
 					log.Fatalf("Error finding unpackaged file: %s", err)
