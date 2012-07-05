@@ -31,6 +31,7 @@ type EtcDiff struct {
 	localDb            *alpm.Db
 	alpmHandle         *alpm.Handle
 	allPackageFile     []File
+	allEtcFile         []File
 	unpackagedFile     []File
 	repoFile           []File
 	modifiedRepoFile   []File
@@ -110,6 +111,31 @@ func (e *EtcDiff) BackupFile() []File {
 	return e.backupFile
 }
 
+func (e *EtcDiff) AllEtcFile() []File {
+	if e.allEtcFile == nil {
+		filepath.Walk(
+			filepath.Join(e.Root, "etc"),
+			func(path string, info os.FileInfo, err error) error {
+				if e.IsIgnored(path) {
+					return nil
+				}
+				if info.IsDir() {
+					return nil
+				}
+				if err != nil {
+					if os.IsPermission(err) {
+						log.Printf("Skipping file: %s", err)
+						return nil
+					}
+					log.Fatalf("Error finding unpackaged file: %s", err)
+				}
+				e.allEtcFile = append(e.allEtcFile, File{Name: path[1:]})
+				return nil
+			})
+	}
+	return e.allEtcFile
+}
+
 func (e *EtcDiff) AllPackageFile() []File {
 	if e.allPackageFile == nil {
 		e.LocalDb().PkgCache().ForEach(func(pkg alpm.Package) error {
@@ -147,27 +173,11 @@ func (e *EtcDiff) ModifiedBackupFile() []File {
 
 func (e *EtcDiff) UnpackagedFile() []File {
 	if e.unpackagedFile == nil {
-		filepath.Walk(
-			filepath.Join(e.Root, "etc"),
-			func(path string, info os.FileInfo, err error) error {
-				if e.IsIgnored(path) {
-					return nil
-				}
-				if info.IsDir() {
-					return nil
-				}
-				if err != nil {
-					if os.IsPermission(err) {
-						log.Printf("Skipping file: %s", err)
-						return nil
-					}
-					log.Fatalf("Error finding unpackaged file: %s", err)
-				}
-				if !contains(path[1:], e.AllPackageFile()) {
-					e.unpackagedFile = append(e.unpackagedFile, File{Name: path[1:]})
-				}
-				return nil
-			})
+		for _, file := range e.AllEtcFile() {
+			if !contains(file.Name, e.AllPackageFile()) {
+				e.unpackagedFile = append(e.unpackagedFile, file)
+			}
+		}
 	}
 	return e.unpackagedFile
 }
@@ -270,7 +280,6 @@ func main() {
 	flag.Parse()
 	flagconfig.Parse()
 
-	log.Printf("%+v", e.UnpackagedFile())
 	log.Printf("%+v", e.ModifiedRepoFile())
 	log.Printf("%+v", e.MissingInRepo())
 }
