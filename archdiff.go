@@ -20,7 +20,7 @@ type File struct {
 	Hash string
 }
 
-type EtcDiff struct {
+type ArchDiff struct {
 	Verbose     bool
 	Root        string
 	DB          string
@@ -59,8 +59,8 @@ func contains(name string, list []File) bool {
 	return false
 }
 
-func (e *EtcDiff) IsIgnored(path string) bool {
-	for _, glob := range e.IgnoreGlobs {
+func (ad *ArchDiff) IsIgnored(path string) bool {
+	for _, glob := range ad.IgnoreGlobs {
 		matched, err := filepath.Match(glob, path)
 		if err != nil {
 			log.Fatalf("Match error: %s", err)
@@ -72,52 +72,52 @@ func (e *EtcDiff) IsIgnored(path string) bool {
 	return false
 }
 
-func (e *EtcDiff) Alpm() *alpm.Handle {
-	if e.alpmHandle == nil {
+func (ad *ArchDiff) Alpm() *alpm.Handle {
+	if ad.alpmHandle == nil {
 		var err error
-		e.alpmHandle, err = alpm.Init(e.Root, e.DB)
+		ad.alpmHandle, err = alpm.Init(ad.Root, ad.DB)
 		if err != nil {
 			log.Fatalf("Failed to initialize pacman: %s", err)
 		}
 	}
-	return e.alpmHandle
+	return ad.alpmHandle
 }
 
-func (e *EtcDiff) Release() {
-	if e.alpmHandle != nil {
-		e.alpmHandle.Release()
+func (ad *ArchDiff) Release() {
+	if ad.alpmHandle != nil {
+		ad.alpmHandle.Release()
 	}
 }
 
-func (e *EtcDiff) LocalDb() *alpm.Db {
-	if e.localDb == nil {
+func (ad *ArchDiff) LocalDb() *alpm.Db {
+	if ad.localDb == nil {
 		var err error
-		e.localDb, err = e.Alpm().LocalDb()
+		ad.localDb, err = ad.Alpm().LocalDb()
 		if err != nil {
 			log.Fatalf("Error loading local DB: %s", err)
 		}
 	}
-	return e.localDb
+	return ad.localDb
 }
 
-func (e *EtcDiff) BackupFile() []File {
-	if e.backupFile == nil {
-		e.LocalDb().PkgCache().ForEach(func(pkg alpm.Package) error {
+func (ad *ArchDiff) BackupFile() []File {
+	if ad.backupFile == nil {
+		ad.LocalDb().PkgCache().ForEach(func(pkg alpm.Package) error {
 			return pkg.Backup().ForEach(func(bf alpm.BackupFile) error {
-				e.backupFile = append(e.backupFile, File{Name: bf.Name, Hash: bf.Hash})
+				ad.backupFile = append(ad.backupFile, File{Name: bf.Name, Hash: bf.Hash})
 				return nil
 			})
 		})
 	}
-	return e.backupFile
+	return ad.backupFile
 }
 
-func (e *EtcDiff) AllEtcFile() []File {
-	if e.allEtcFile == nil {
+func (ad *ArchDiff) AllEtcFile() []File {
+	if ad.allEtcFile == nil {
 		filepath.Walk(
-			filepath.Join(e.Root, "etc"),
+			filepath.Join(ad.Root, "etc"),
 			func(path string, info os.FileInfo, err error) error {
-				if e.IsIgnored(path) {
+				if ad.IsIgnored(path) {
 					return nil
 				}
 				if info.IsDir() {
@@ -130,30 +130,30 @@ func (e *EtcDiff) AllEtcFile() []File {
 					}
 					log.Fatalf("Error finding unpackaged file: %s", err)
 				}
-				e.allEtcFile = append(e.allEtcFile, File{Name: path[1:]})
+				ad.allEtcFile = append(ad.allEtcFile, File{Name: path[1:]})
 				return nil
 			})
 	}
-	return e.allEtcFile
+	return ad.allEtcFile
 }
 
-func (e *EtcDiff) AllPackageFile() []File {
-	if e.allPackageFile == nil {
-		e.LocalDb().PkgCache().ForEach(func(pkg alpm.Package) error {
+func (ad *ArchDiff) AllPackageFile() []File {
+	if ad.allPackageFile == nil {
+		ad.LocalDb().PkgCache().ForEach(func(pkg alpm.Package) error {
 			for _, file := range pkg.Files() {
-				e.allPackageFile = append(e.allPackageFile, File{Name: file.Name})
+				ad.allPackageFile = append(ad.allPackageFile, File{Name: file.Name})
 			}
 			return nil
 		})
 	}
-	return e.allPackageFile
+	return ad.allPackageFile
 }
 
-func (e *EtcDiff) ModifiedBackupFile() []File {
-	if e.modifiedBackupFile == nil {
-		for _, file := range e.BackupFile() {
-			fullname := filepath.Join(e.Root, file.Name)
-			if e.IsIgnored(fullname) {
+func (ad *ArchDiff) ModifiedBackupFile() []File {
+	if ad.modifiedBackupFile == nil {
+		for _, file := range ad.BackupFile() {
+			fullname := filepath.Join(ad.Root, file.Name)
+			if ad.IsIgnored(fullname) {
 				continue
 			}
 			actual, err := filehash(fullname)
@@ -165,28 +165,28 @@ func (e *EtcDiff) ModifiedBackupFile() []File {
 				log.Fatalf("Error calculating actual hash: %s", err)
 			}
 			if actual != file.Hash {
-				e.modifiedBackupFile = append(e.modifiedBackupFile, file)
+				ad.modifiedBackupFile = append(ad.modifiedBackupFile, file)
 			}
 		}
 	}
-	return e.modifiedBackupFile
+	return ad.modifiedBackupFile
 }
 
-func (e *EtcDiff) UnpackagedFile() []File {
-	if e.unpackagedFile == nil {
-		for _, file := range e.AllEtcFile() {
-			if !contains(file.Name, e.AllPackageFile()) {
-				e.unpackagedFile = append(e.unpackagedFile, file)
+func (ad *ArchDiff) UnpackagedFile() []File {
+	if ad.unpackagedFile == nil {
+		for _, file := range ad.AllEtcFile() {
+			if !contains(file.Name, ad.AllPackageFile()) {
+				ad.unpackagedFile = append(ad.unpackagedFile, file)
 			}
 		}
 	}
-	return e.unpackagedFile
+	return ad.unpackagedFile
 }
 
-func (e *EtcDiff) RepoFile() []File {
-	if e.repoFile == nil {
+func (ad *ArchDiff) RepoFile() []File {
+	if ad.repoFile == nil {
 		cmd := exec.Command("git", "ls-files")
-		cmd.Dir = e.Repo
+		cmd.Dir = ad.Repo
 		out, err := cmd.Output()
 		if err != nil {
 			log.Fatalf("Error listing repo files: %s", err)
@@ -200,18 +200,18 @@ func (e *EtcDiff) RepoFile() []File {
 				}
 				log.Fatalf("Error parsing repo listing: %s", err)
 			}
-			e.repoFile = append(
-				e.repoFile, File{Name: line[:len(line)-1]}) // drop trailing \n
+			ad.repoFile = append(
+				ad.repoFile, File{Name: line[:len(line)-1]}) // drop trailing \n
 		}
 	}
-	return e.repoFile
+	return ad.repoFile
 }
 
-func (e *EtcDiff) ModifiedRepoFile() []File {
-	if e.modifiedRepoFile == nil {
-		for _, file := range e.RepoFile() {
-			realpath := filepath.Join(e.Root, file.Name)
-			repopath := filepath.Join(e.Repo, file.Name)
+func (ad *ArchDiff) ModifiedRepoFile() []File {
+	if ad.modifiedRepoFile == nil {
+		for _, file := range ad.RepoFile() {
+			realpath := filepath.Join(ad.Root, file.Name)
+			repopath := filepath.Join(ad.Repo, file.Name)
 			realhash, err := filehash(realpath)
 			if err != nil && !os.IsNotExist(err) {
 				if os.IsPermission(err) {
@@ -229,82 +229,82 @@ func (e *EtcDiff) ModifiedRepoFile() []File {
 				log.Fatalf("Error looking for modified repo files (repo): %s", err)
 			}
 			if realhash != repohash {
-				e.modifiedRepoFile = append(e.modifiedRepoFile, file)
+				ad.modifiedRepoFile = append(ad.modifiedRepoFile, file)
 			}
 		}
 	}
-	return e.modifiedRepoFile
+	return ad.modifiedRepoFile
 }
 
-func (e *EtcDiff) MissingInRepo() []File {
-	if e.missingInRepo == nil {
-		for _, file := range e.ModifiedBackupFile() {
-			if !contains(file.Name, e.RepoFile()) {
-				e.missingInRepo = append(e.missingInRepo, file)
+func (ad *ArchDiff) MissingInRepo() []File {
+	if ad.missingInRepo == nil {
+		for _, file := range ad.ModifiedBackupFile() {
+			if !contains(file.Name, ad.RepoFile()) {
+				ad.missingInRepo = append(ad.missingInRepo, file)
 			}
 		}
-		for _, file := range e.UnpackagedFile() {
-			if !contains(file.Name, e.RepoFile()) {
-				e.missingInRepo = append(e.missingInRepo, file)
+		for _, file := range ad.UnpackagedFile() {
+			if !contains(file.Name, ad.RepoFile()) {
+				ad.missingInRepo = append(ad.missingInRepo, file)
 			}
 		}
 	}
-	return e.missingInRepo
+	return ad.missingInRepo
 }
 
-func (e *EtcDiff) ListNamed(name string) []File {
+func (ad *ArchDiff) ListNamed(name string) []File {
 	switch name {
 	case "missing-in-repo":
-		return e.MissingInRepo()
+		return ad.MissingInRepo()
 	case "modified-in-repo":
-		return e.ModifiedRepoFile()
+		return ad.ModifiedRepoFile()
 	case "package-backups":
-		return e.BackupFile()
+		return ad.BackupFile()
 	case "etc":
-		return e.AllEtcFile()
+		return ad.AllEtcFile()
 	case "package":
-		return e.AllPackageFile()
+		return ad.AllPackageFile()
 	case "modified-backups":
-		return e.ModifiedBackupFile()
+		return ad.ModifiedBackupFile()
 	case "unpackaged":
-		return e.UnpackagedFile()
+		return ad.UnpackagedFile()
 	case "repo":
-		return e.RepoFile()
+		return ad.RepoFile()
 	}
 	log.Fatalf("unknown list name: %s", name)
 	panic("not reached")
 }
 
-func (e *EtcDiff) CommandLs(args []string) {
+func (ad *ArchDiff) CommandLs(args []string) {
 	for _, name := range args[1:] {
 		fmt.Println(name)
-		for _, file := range e.ListNamed(name) {
+		for _, file := range ad.ListNamed(name) {
 			fmt.Println(" ", file.Name)
 		}
 	}
 }
 
-func (e *EtcDiff) CommandUnknown(args []string) {
+func (ad *ArchDiff) CommandUnknown(args []string) {
 	log.Fatalf("unknown command: %s", strings.Join(args, " "))
 }
 
-func (e *EtcDiff) Command(args []string) {
+func (ad *ArchDiff) Command(args []string) {
 	switch args[0] {
 	case "ls":
-		e.CommandLs(args)
+		ad.CommandLs(args)
 	default:
-		e.CommandUnknown(args)
+		ad.CommandUnknown(args)
 	}
 }
 
 func main() {
-	e := &EtcDiff{}
-	flag.BoolVar(&e.Verbose, "verbose", false, "verbose")
-	flag.StringVar(&e.Root, "root", "/", "set an alternate installation root")
+	ad := &ArchDiff{}
+	flag.BoolVar(&ad.Verbose, "verbose", false, "verbose")
+	flag.StringVar(&ad.Root, "root", "/", "set an alternate installation root")
 	flag.StringVar(
-		&e.DB, "dbpath", "/var/lib/pacman", "set an alternate database location")
-	flag.StringVar(&e.Repo, "repo", "", "repo directory")
-	e.IgnoreGlobs = []string{
+		&ad.DB, "dbpath", "/var/lib/pacman", "set an alternate database location")
+	flag.StringVar(&ad.Repo, "repo", "", "repo directory")
+	ad.IgnoreGlobs = []string{
 		"/etc/group",
 		"/etc/gshadow",
 		"/etc/passwd",
@@ -326,5 +326,5 @@ func main() {
 	flag.Parse()
 	flagconfig.Parse()
 
-	e.Command(flag.Args())
+	ad.Command(flag.Args())
 }
