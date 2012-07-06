@@ -22,6 +22,7 @@ type File struct {
 
 type ArchDiff struct {
 	Verbose     bool
+	DryRun      bool
 	Root        string
 	DB          string
 	Repo        string
@@ -291,6 +292,45 @@ func (ad *ArchDiff) CommandStatus(args []string) {
 	ad.CommandLs([]string{"ls", "missing-in-repo", "different-in-repo"})
 }
 
+func olderNewer(aPath, bPath string) (older, newer string, err error) {
+	aStat, err := os.Stat(aPath)
+	if err != nil {
+		return "", "", err
+	}
+	bStat, err := os.Stat(bPath)
+	if err != nil {
+		return "", "", err
+	}
+	if aStat.ModTime().After(bStat.ModTime()) {
+		return bPath, aPath, nil
+	}
+	return aPath, bPath, nil
+}
+
+func (ad *ArchDiff) copyFile(source, target string) {
+	if ad.DryRun {
+		fmt.Println("cp", source, target)
+		return
+	}
+}
+
+func (ad *ArchDiff) CommandSync(args []string) {
+	for _, file := range ad.MissingInRepo() {
+		ad.copyFile(
+			filepath.Join(ad.Root, file.Name),
+			filepath.Join(ad.Repo, file.Name))
+	}
+	for _, file := range ad.DiffRepoFile() {
+		older, newer, err := olderNewer(
+			filepath.Join(ad.Root, file.Name),
+			filepath.Join(ad.Repo, file.Name))
+		if err != nil {
+			log.Fatalf("Failed to identifier newer file: %s", err)
+		}
+		ad.copyFile(newer, older)
+	}
+}
+
 func (ad *ArchDiff) CommandUnknown(args []string) {
 	log.Fatalf("unknown command: %s", strings.Join(args, " "))
 }
@@ -301,6 +341,8 @@ func (ad *ArchDiff) Command(args []string) {
 		ad.CommandLs(args)
 	case "status":
 		ad.CommandStatus(args)
+	case "sync":
+		ad.CommandSync(args)
 	default:
 		ad.CommandUnknown(args)
 	}
@@ -309,6 +351,7 @@ func (ad *ArchDiff) Command(args []string) {
 func main() {
 	ad := &ArchDiff{}
 	flag.BoolVar(&ad.Verbose, "verbose", false, "verbose")
+	flag.BoolVar(&ad.DryRun, "f", true, "dry run")
 	flag.StringVar(&ad.Root, "root", "/", "set an alternate installation root")
 	flag.StringVar(
 		&ad.DB, "dbpath", "/var/lib/pacman", "set an alternate database location")
@@ -372,6 +415,8 @@ func main() {
 		"/var/lock",
 		"/var/log/*",
 		"/var/run",
+		"/etc/machine-id",
+		"/usr/sbin/sendmail",
 		"/var/spool/*", /**/
 	}
 
