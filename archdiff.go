@@ -287,6 +287,10 @@ func (ad *ArchDiff) CommandLs(args []string) {
 	}
 }
 
+func (ad *ArchDiff) CommandStatus(args []string) {
+	ad.CommandLs([]string{"ls", "missing-in-repo", "modified-in-repo"})
+}
+
 func (ad *ArchDiff) CommandUnknown(args []string) {
 	log.Fatalf("unknown command: %s", strings.Join(args, " "))
 }
@@ -295,6 +299,8 @@ func (ad *ArchDiff) Command(args []string) {
 	switch args[0] {
 	case "ls":
 		ad.CommandLs(args)
+	case "status":
+		ad.CommandStatus(args)
 	default:
 		ad.CommandUnknown(args)
 	}
