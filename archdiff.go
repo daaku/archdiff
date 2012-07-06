@@ -35,7 +35,7 @@ type ArchDiff struct {
 	allFile            []File
 	unpackagedFile     []File
 	repoFile           []File
-	modifiedRepoFile   []File
+	diffRepoFile       []File
 	missingInRepo      []File
 }
 
@@ -210,8 +210,8 @@ func (ad *ArchDiff) RepoFile() []File {
 	return ad.repoFile
 }
 
-func (ad *ArchDiff) ModifiedRepoFile() []File {
-	if ad.modifiedRepoFile == nil {
+func (ad *ArchDiff) DiffRepoFile() []File {
+	if ad.diffRepoFile == nil {
 		for _, file := range ad.RepoFile() {
 			realpath := filepath.Join(ad.Root, file.Name)
 			repopath := filepath.Join(ad.Repo, file.Name)
@@ -232,11 +232,11 @@ func (ad *ArchDiff) ModifiedRepoFile() []File {
 				log.Fatalf("Error looking for modified repo files (repo): %s", err)
 			}
 			if realhash != repohash {
-				ad.modifiedRepoFile = append(ad.modifiedRepoFile, file)
+				ad.diffRepoFile = append(ad.diffRepoFile, file)
 			}
 		}
 	}
-	return ad.modifiedRepoFile
+	return ad.diffRepoFile
 }
 
 func (ad *ArchDiff) MissingInRepo() []File {
@@ -259,8 +259,8 @@ func (ad *ArchDiff) ListNamed(name string) []File {
 	switch name {
 	case "missing-in-repo":
 		return ad.MissingInRepo()
-	case "modified-in-repo":
-		return ad.ModifiedRepoFile()
+	case "different-in-repo":
+		return ad.DiffRepoFile()
 	case "package-backups":
 		return ad.BackupFile()
 	case "all":
@@ -288,7 +288,7 @@ func (ad *ArchDiff) CommandLs(args []string) {
 }
 
 func (ad *ArchDiff) CommandStatus(args []string) {
-	ad.CommandLs([]string{"ls", "missing-in-repo", "modified-in-repo"})
+	ad.CommandLs([]string{"ls", "missing-in-repo", "different-in-repo"})
 }
 
 func (ad *ArchDiff) CommandUnknown(args []string) {
