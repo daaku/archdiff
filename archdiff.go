@@ -32,7 +32,7 @@ type ArchDiff struct {
 	localDb            *alpm.Db
 	alpmHandle         *alpm.Handle
 	allPackageFile     []File
-	allEtcFile         []File
+	allFile            []File
 	unpackagedFile     []File
 	repoFile           []File
 	modifiedRepoFile   []File
@@ -112,12 +112,15 @@ func (ad *ArchDiff) BackupFile() []File {
 	return ad.backupFile
 }
 
-func (ad *ArchDiff) AllEtcFile() []File {
-	if ad.allEtcFile == nil {
+func (ad *ArchDiff) AllFile() []File {
+	if ad.allFile == nil {
 		filepath.Walk(
-			filepath.Join(ad.Root, "etc"),
+			ad.Root,
 			func(path string, info os.FileInfo, err error) error {
 				if ad.IsIgnored(path) {
+					if info.IsDir() {
+						return filepath.SkipDir
+					}
 					return nil
 				}
 				if info.IsDir() {
@@ -130,11 +133,11 @@ func (ad *ArchDiff) AllEtcFile() []File {
 					}
 					log.Fatalf("Error finding unpackaged file: %s", err)
 				}
-				ad.allEtcFile = append(ad.allEtcFile, File{Name: path[1:]})
+				ad.allFile = append(ad.allFile, File{Name: path[1:]})
 				return nil
 			})
 	}
-	return ad.allEtcFile
+	return ad.allFile
 }
 
 func (ad *ArchDiff) AllPackageFile() []File {
@@ -174,7 +177,7 @@ func (ad *ArchDiff) ModifiedBackupFile() []File {
 
 func (ad *ArchDiff) UnpackagedFile() []File {
 	if ad.unpackagedFile == nil {
-		for _, file := range ad.AllEtcFile() {
+		for _, file := range ad.AllFile() {
 			if !contains(file.Name, ad.AllPackageFile()) {
 				ad.unpackagedFile = append(ad.unpackagedFile, file)
 			}
@@ -260,8 +263,8 @@ func (ad *ArchDiff) ListNamed(name string) []File {
 		return ad.ModifiedRepoFile()
 	case "package-backups":
 		return ad.BackupFile()
-	case "etc":
-		return ad.AllEtcFile()
+	case "all":
+		return ad.AllFile()
 	case "package":
 		return ad.AllPackageFile()
 	case "modified-backups":
@@ -305,22 +308,65 @@ func main() {
 		&ad.DB, "dbpath", "/var/lib/pacman", "set an alternate database location")
 	flag.StringVar(&ad.Repo, "repo", "", "repo directory")
 	ad.IgnoreGlobs = []string{
-		"/etc/group",
-		"/etc/gshadow",
-		"/etc/passwd",
-		"/etc/shadow",
-		"/etc/shells",
+		"/boot/grub/*stage*",
+		"/boot/initramfs-linux-fallback.img",
+		"/boot/initramfs-linux.img",
+		"/dev/*",
 		"/etc/.pwd.lock",
+		"/etc/group",
 		"/etc/group-",
+		"/etc/gshadow",
 		"/etc/gshadow-",
 		"/etc/ld.so.cache",
+		"/etc/mtab",
 		"/etc/pacman.d/gnupg/*",
+		"/etc/passwd",
 		"/etc/passwd-",
 		"/etc/profile.d/locale.sh",
 		"/etc/rndc.key",
+		"/etc/shadow",
 		"/etc/shadow-",
+		"/etc/shells",
 		"/etc/ssh/ssh_host_*key*",
-		"/etc/ssl/certs/*", /**/
+		"/etc/ssl/certs/*",
+		"/home/*",
+		"/lib/modules/*/modules*",
+		"/proc/*",
+		"/root/.bash_history",
+		"/root/.ssh/authorized_keys2",
+		"/root/.ssh/known_hosts",
+		"/run/*",
+		"/sys/*",
+		"/tmp/*",
+		"/usr/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache",
+		"/usr/lib/locale/locale-archive",
+		"/usr/share/applications/mimeinfo.cache",
+		"/usr/share/fonts/*/fonts.dir",
+		"/usr/share/fonts/*/fonts.scale",
+		"/usr/share/glib-2.0/schemas/gschemas.compiled",
+		"/usr/share/info/dir",
+		"/usr/share/mime/version",
+		"/var/cache/fontconfig/*",
+		"/var/cache/ldconfig/*",
+		"/var/cache/man/*",
+		"/var/cache/pacman/*",
+		"/var/db/sudo/*",
+		"/var/lib/dbus/machine-id",
+		"/var/lib/dhcpcd/dhcpcd-eth0.lease",
+		"/var/lib/hwclock/adjtime",
+		"/var/lib/logrotate.status",
+		"/var/lib/misc/random-seed",
+		"/var/lib/mlocate/mlocate.db",
+		"/var/lib/pacman/*",
+		"/var/lib/postgres/data/*",
+		"/var/lib/random-seed",
+		"/var/lib/redis/dump.rdb",
+		"/var/lib/sudo/*",
+		"/var/lib/syslog-ng/syslog-ng.persist",
+		"/var/lock",
+		"/var/log/*",
+		"/var/run",
+		"/var/spool/*", /**/
 	}
 
 	flag.Parse()
