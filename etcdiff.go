@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 )
 
 type File struct {
@@ -251,6 +252,51 @@ func (e *EtcDiff) MissingInRepo() []File {
 	return e.missingInRepo
 }
 
+func (e *EtcDiff) ListNamed(name string) []File {
+	switch name {
+	case "missing-in-repo":
+		return e.MissingInRepo()
+	case "modified-in-repo":
+		return e.ModifiedRepoFile()
+	case "package-backups":
+		return e.BackupFile()
+	case "etc":
+		return e.AllEtcFile()
+	case "package":
+		return e.AllPackageFile()
+	case "modified-backups":
+		return e.ModifiedBackupFile()
+	case "unpackaged":
+		return e.UnpackagedFile()
+	case "repo":
+		return e.RepoFile()
+	}
+	log.Fatalf("unknown list name: %s", name)
+	panic("not reached")
+}
+
+func (e *EtcDiff) CommandLs(args []string) {
+	for _, name := range args[1:] {
+		fmt.Println(name)
+		for _, file := range e.ListNamed(name) {
+			fmt.Println(" ", file.Name)
+		}
+	}
+}
+
+func (e *EtcDiff) CommandUnknown(args []string) {
+	log.Fatalf("unknown command: %s", strings.Join(args, " "))
+}
+
+func (e *EtcDiff) Command(args []string) {
+	switch args[0] {
+	case "ls":
+		e.CommandLs(args)
+	default:
+		e.CommandUnknown(args)
+	}
+}
+
 func main() {
 	e := &EtcDiff{}
 	flag.BoolVar(&e.Verbose, "verbose", false, "verbose")
@@ -280,6 +326,5 @@ func main() {
 	flag.Parse()
 	flagconfig.Parse()
 
-	log.Printf("%+v", e.ModifiedRepoFile())
-	log.Printf("%+v", e.MissingInRepo())
+	e.Command(flag.Args())
 }
