@@ -417,7 +417,7 @@ func main() {
 		"/var/run",
 		"/etc/machine-id",
 		"/usr/sbin/sendmail",
-		"/var/spool/*", /**/
+		"/var/spool/cronstamps/*", /**/
 	}
 
 	flag.Parse()
