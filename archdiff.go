@@ -335,7 +335,14 @@ func (ad *ArchDiff) CommandUnknown(args []string) {
 	log.Fatalf("unknown command: %s", strings.Join(args, " "))
 }
 
+func (ad *ArchDiff) Usage() {
+	log.Fatalf("usage: archdiff [ls | status | sync]")
+}
+
 func (ad *ArchDiff) Command(args []string) {
+	if len(args) == 0 {
+		ad.Usage()
+	}
 	switch args[0] {
 	case "ls":
 		ad.CommandLs(args)
