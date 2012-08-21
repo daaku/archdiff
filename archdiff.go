@@ -164,9 +164,9 @@ func (ad *ArchDiff) ModifiedBackupFile() []File {
 			if err != nil {
 				if os.IsPermission(err) {
 					log.Printf("Skipping file: %s\n", err)
-					continue
 				}
-				log.Fatalf("Error calculating actual hash: %s", err)
+				log.Printf("Error calculating actual hash: %s", err)
+				continue
 			}
 			if actual != file.Hash {
 				ad.modifiedBackupFile = append(ad.modifiedBackupFile, file)
