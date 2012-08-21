@@ -367,6 +367,7 @@ func main() {
 		"/etc/gshadow",
 		"/etc/gshadow-",
 		"/etc/ld.so.cache",
+		"/etc/machine-id",
 		"/etc/mtab",
 		"/etc/pacman.d/gnupg/*",
 		"/etc/passwd",
@@ -415,8 +416,6 @@ func main() {
 		"/var/lock",
 		"/var/log/*",
 		"/var/run",
-		"/etc/machine-id",
-		"/usr/sbin/sendmail",
 		"/var/spool/cronstamps/*", /**/
 	}
 
