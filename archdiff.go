@@ -381,6 +381,8 @@ func main() {
 		"/etc/ssl/certs/*",
 		"/home/*",
 		"/lib/modules/*/modules*",
+		"/media/*",
+		"/mnt/*",
 		"/proc/*",
 		"/root/.bash_history",
 		"/root/.ssh/authorized_keys2",
