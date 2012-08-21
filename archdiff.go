@@ -27,6 +27,7 @@ type ArchDiff struct {
 	DB          string
 	Repo        string
 	IgnoreGlobs []string
+	QuickRun    bool
 
 	backupFile         []File
 	modifiedBackupFile []File
@@ -359,6 +360,7 @@ func main() {
 	ad := &ArchDiff{}
 	flag.BoolVar(&ad.Verbose, "verbose", false, "verbose")
 	flag.BoolVar(&ad.DryRun, "f", true, "dry run")
+	flag.BoolVar(&ad.QuickRun, "quick", true, "quick run excluding some directories")
 	flag.StringVar(&ad.Root, "root", "/", "set an alternate installation root")
 	flag.StringVar(
 		&ad.DB, "dbpath", "/var/lib/pacman", "set an alternate database location")
@@ -426,6 +428,18 @@ func main() {
 		"/var/log/*",
 		"/var/run",
 		"/var/spool/cronstamps/*", /**/
+	}
+
+	if ad.QuickRun {
+		ad.IgnoreGlobs = append(
+			ad.IgnoreGlobs,
+			"/bin/*",
+			"/lib/*",
+			"/lib64/*",
+			"/media/*",
+			"/sbin/*",
+			"/usr/*",
+		)
 	}
 
 	flag.Parse()
