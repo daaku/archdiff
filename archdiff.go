@@ -439,6 +439,7 @@ func main() {
 		"/var/lib/pacman/*",
 		"/var/lib/postgres/data/*",
 		"/var/lib/random-seed",
+		"/var/lib/redis/appendonly.aof",
 		"/var/lib/redis/dump.rdb",
 		"/var/lib/sudo/*",
 		"/var/lib/syslog-ng/syslog-ng.persist",
