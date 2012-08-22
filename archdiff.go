@@ -22,6 +22,7 @@ type File struct {
 
 type ArchDiff struct {
 	Verbose     bool
+	Silent      bool
 	DryRun      bool
 	Root        string
 	DB          string
@@ -130,7 +131,9 @@ func (ad *ArchDiff) AllFile() []File {
 				}
 				if err != nil {
 					if os.IsPermission(err) {
-						log.Printf("Skipping file: %s", err)
+						if !ad.Silent {
+							log.Printf("Skipping file: %s", err)
+						}
 						return nil
 					}
 					log.Fatalf("Error finding unpackaged file: %s", err)
@@ -163,10 +166,9 @@ func (ad *ArchDiff) ModifiedBackupFile() []File {
 			}
 			actual, err := filehash(fullname)
 			if err != nil {
-				if os.IsPermission(err) {
-					log.Printf("Skipping file: %s\n", err)
+				if !ad.Silent {
+					log.Printf("Error calculating current hash: %s", err)
 				}
-				log.Printf("Error calculating actual hash: %s", err)
 				continue
 			}
 			if actual != file.Hash {
@@ -220,7 +222,9 @@ func (ad *ArchDiff) DiffRepoFile() []File {
 			realhash, err := filehash(realpath)
 			if err != nil && !os.IsNotExist(err) {
 				if os.IsPermission(err) {
-					log.Printf("Skipping file: %s", err)
+					if !ad.Silent {
+						log.Printf("Skipping file: %s", err)
+					}
 					continue
 				}
 				log.Fatalf("Error looking for modified repo files (real): %s", err)
@@ -228,7 +232,9 @@ func (ad *ArchDiff) DiffRepoFile() []File {
 			repohash, err := filehash(repopath)
 			if err != nil && !os.IsNotExist(err) {
 				if os.IsPermission(err) {
-					log.Printf("Skipping file: %s", err)
+					if !ad.Silent {
+						log.Printf("Skipping file: %s", err)
+					}
 					continue
 				}
 				log.Fatalf("Error looking for modified repo files (repo): %s", err)
@@ -359,6 +365,7 @@ func (ad *ArchDiff) Command(args []string) {
 func main() {
 	ad := &ArchDiff{}
 	flag.BoolVar(&ad.Verbose, "verbose", false, "verbose")
+	flag.BoolVar(&ad.Silent, "silent", false, "suppress errors")
 	flag.BoolVar(&ad.DryRun, "f", true, "dry run")
 	flag.BoolVar(&ad.QuickRun, "quick", true, "quick run excluding some directories")
 	flag.StringVar(&ad.Root, "root", "/", "set an alternate installation root")
@@ -381,6 +388,8 @@ func main() {
 		"/etc/machine-id",
 		"/etc/mtab",
 		"/etc/pacman.d/gnupg/*",
+		"/etc/pango/pango.modules",
+		"/etc/gconf/gconf.xml.defaults/*gconf-tree.xml",
 		"/etc/passwd",
 		"/etc/passwd-",
 		"/etc/profile.d/locale.sh",
