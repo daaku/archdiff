@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 )
 
@@ -29,6 +30,7 @@ type ArchDiff struct {
 	Repo        string
 	IgnoreGlobs []string
 	QuickRun    bool
+	MaxProcs    int
 
 	backupFile         []File
 	modifiedBackupFile []File
@@ -364,6 +366,7 @@ func (ad *ArchDiff) Command(args []string) {
 
 func main() {
 	ad := &ArchDiff{}
+	flag.IntVar(&ad.MaxProcs, "max-procs", runtime.NumCPU()*2, "go max procs")
 	flag.BoolVar(&ad.Verbose, "verbose", false, "verbose")
 	flag.BoolVar(&ad.Silent, "silent", false, "suppress errors")
 	flag.BoolVar(&ad.DryRun, "f", true, "dry run")
@@ -464,5 +467,6 @@ func main() {
 	flag.Parse()
 	flagconfig.Parse()
 
+	runtime.GOMAXPROCS(ad.MaxProcs)
 	ad.Command(flag.Args())
 }
