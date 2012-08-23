@@ -460,7 +460,7 @@ func main() {
 			"/lib64/*",
 			"/media/*",
 			"/sbin/*",
-			"/usr/*",
+			"/usr/*", /**/
 		)
 	}
 
