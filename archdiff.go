@@ -1,3 +1,9 @@
+// Command archdiff implements a tool to view and manipulate a "system
+// level diff" of sorts. It's somewhat akin to the "things that differ"
+// if a new system was given the exact current set of packages
+// combined with a target directory that can be considered an "overlay"
+// on top of the packages for things like configuration and or ignored
+// data.
 package main
 
 import (
