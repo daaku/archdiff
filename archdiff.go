@@ -207,6 +207,7 @@ func (ad *ArchDiff) UnpackagedFile() []File {
 
 func (ad *ArchDiff) RepoFile() []File {
 	if ad.repoFile == nil {
+
 		cmd := exec.Command("git", "ls-files")
 		cmd.Dir = ad.Repo
 		out, err := cmd.Output()
@@ -351,7 +352,7 @@ func (ad *ArchDiff) CommandSync(args []string) {
 			filepath.Join(ad.Root, file.Name),
 			filepath.Join(ad.Repo, file.Name))
 		if err != nil {
-			log.Fatalf("Failed to identifier newer file: %s", err)
+			log.Fatalf("Failed to identify newer file: %s", err)
 		}
 		ad.copyFile(older, newer)
 	}
