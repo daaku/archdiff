@@ -12,6 +12,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/daaku/go-alpm"
+	"github.com/daaku/go.copyfile"
 	"github.com/daaku/go.flagconfig"
 	"io"
 	"log"
@@ -48,6 +49,11 @@ type ArchDiff struct {
 	repoFile           []File
 	diffRepoFile       []File
 	missingInRepo      []File
+}
+
+var cp = &copyfile.Copy{
+	KeepLinks: true,
+	Force:     true,
 }
 
 func filehash(path string) (string, error) {
@@ -322,18 +328,22 @@ func olderNewer(aPath, bPath string) (older, newer string, err error) {
 	return aPath, bPath, nil
 }
 
-func (ad *ArchDiff) copyFile(source, target string) {
+func (ad *ArchDiff) copyFile(dst, src string) {
 	if ad.DryRun {
-		fmt.Println("cp", source, target)
+		fmt.Println("cp", src, dst)
 		return
+	}
+	_, err := cp.Single(dst, src)
+	if err != nil && !ad.Silent {
+		log.Printf("failed to copy file %s to %s: %s", src, dst, err)
 	}
 }
 
 func (ad *ArchDiff) CommandSync(args []string) {
 	for _, file := range ad.MissingInRepo() {
 		ad.copyFile(
-			filepath.Join(ad.Root, file.Name),
-			filepath.Join(ad.Repo, file.Name))
+			filepath.Join(ad.Repo, file.Name),
+			filepath.Join(ad.Root, file.Name))
 	}
 	for _, file := range ad.DiffRepoFile() {
 		older, newer, err := olderNewer(
@@ -342,7 +352,7 @@ func (ad *ArchDiff) CommandSync(args []string) {
 		if err != nil {
 			log.Fatalf("Failed to identifier newer file: %s", err)
 		}
-		ad.copyFile(newer, older)
+		ad.copyFile(older, newer)
 	}
 }
 
