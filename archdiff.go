@@ -54,6 +54,7 @@ type ArchDiff struct {
 var cp = &copyfile.Copy{
 	KeepLinks: true,
 	Force:     true,
+	Clobber:   true,
 }
 
 func filehash(path string) (string, error) {
