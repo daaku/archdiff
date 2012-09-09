@@ -15,6 +15,7 @@ import (
 	"github.com/daaku/go.copyfile"
 	"github.com/daaku/go.flagconfig"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/exec"
@@ -29,16 +30,16 @@ type File struct {
 }
 
 type ArchDiff struct {
-	Verbose     bool
-	Silent      bool
-	DryRun      bool
-	Root        string
-	DB          string
-	Repo        string
-	IgnoreGlobs []string
-	QuickRun    bool
-	MaxProcs    int
+	Verbose    bool
+	Silent     bool
+	DryRun     bool
+	Root       string
+	DB         string
+	Repo       string
+	IgnoreFile string
+	MaxProcs   int
 
+	ignoreGlob         []string
 	backupFile         []File
 	modifiedBackupFile []File
 	localDb            *alpm.Db
@@ -77,8 +78,29 @@ func contains(name string, list []File) bool {
 	return false
 }
 
+func (ad *ArchDiff) IgnoreGlob() []string {
+	if ad.ignoreGlob == nil && ad.IgnoreFile != "" {
+		content, err := ioutil.ReadFile(ad.IgnoreFile)
+		if err != nil {
+			log.Fatalf("failed to read ignore file %s: %s", ad.IgnoreFile, err)
+		}
+		lines := bytes.Split(content, []byte{'\n'})
+		for _, r := range lines {
+			l := string(r)
+			if len(l) == 0 {
+				continue
+			}
+			if l[0] == '#' {
+				continue
+			}
+			ad.ignoreGlob = append(ad.ignoreGlob, l)
+		}
+	}
+	return ad.ignoreGlob
+}
+
 func (ad *ArchDiff) IsIgnored(path string) bool {
-	for _, glob := range ad.IgnoreGlobs {
+	for _, glob := range ad.IgnoreGlob() {
 		matched, err := filepath.Match(glob, path)
 		if err != nil {
 			log.Fatalf("Match error: %s", err)
@@ -388,114 +410,11 @@ func main() {
 	flag.BoolVar(&ad.Verbose, "verbose", false, "verbose")
 	flag.BoolVar(&ad.Silent, "silent", false, "suppress errors")
 	flag.BoolVar(&ad.DryRun, "f", true, "dry run")
-	flag.BoolVar(&ad.QuickRun, "quick", true, "quick run excluding some directories")
 	flag.StringVar(&ad.Root, "root", "/", "set an alternate installation root")
 	flag.StringVar(
 		&ad.DB, "dbpath", "/var/lib/pacman", "set an alternate database location")
 	flag.StringVar(&ad.Repo, "repo", "", "repo directory")
-	ad.IgnoreGlobs = []string{
-		"/boot/grub/*stage*",
-		"/boot/grub/locale/*",
-		"/boot/grub/x86_64-efi/*",
-		"/boot/initramfs-linux-fallback.img",
-		"/boot/initramfs-linux.img",
-		"/dev/*",
-		"/etc/.pwd.lock",
-		"/etc/adjtime",
-		"/etc/gconf/gconf.xml.defaults/*gconf-tree.xml",
-		"/etc/group",
-		"/etc/group-",
-		"/etc/gshadow",
-		"/etc/gshadow-",
-		"/etc/gtk-2.0/gdk-pixbuf.loaders",
-		"/etc/gtk-2.0/gtk.immodules",
-		"/etc/jnpr-nc-hosts.bak",
-		"/etc/jnpr-nc-resolv.conf",
-		"/etc/ld.so.cache",
-		"/etc/machine-id",
-		"/etc/mtab",
-		"/etc/pacman.d/gnupg/*",
-		"/etc/pango/pango.modules",
-		"/etc/passwd",
-		"/etc/passwd-",
-		"/etc/profile.d/locale.sh",
-		"/etc/rndc.key",
-		"/etc/shadow",
-		"/etc/shadow-",
-		"/etc/shells",
-		"/etc/ssh/ssh_host_*key*",
-		"/etc/ssl/certs/*",
-		"/etc/xml/catalog",
-		"/home/*",
-		"/lib/modules/*/modules*",
-		"/media/*",
-		"/mnt/*",
-		"/proc/*",
-		"/root/.Xauthority",
-		"/root/.bash_history",
-		"/root/.config/*",
-		"/root/.dbus/*",
-		"/root/.esd_auth",
-		"/root/.juniper_networks",
-		"/root/.lesshst",
-		"/root/.pulse-cookie",
-		"/root/.pulse/*",
-		"/root/.rediscli_history",
-		"/root/.ssh/authorized_keys2",
-		"/root/.ssh/known_hosts",
-		"/run/*",
-		"/sys/*",
-		"/tmp/*",
-		"/usr/lib/gdk-pixbuf-2.0/2.10.0/loaders.cache",
-		"/usr/lib/locale/locale-archive",
-		"/usr/share/applications/mimeinfo.cache",
-		"/usr/share/fonts/*/fonts.dir",
-		"/usr/share/fonts/*/fonts.scale",
-		"/usr/share/glib-2.0/schemas/gschemas.compiled",
-		"/usr/share/info/dir",
-		"/usr/share/mime/version",
-		"/var/cache/cups/*",
-		"/var/cache/fontconfig/*",
-		"/var/cache/ldconfig/*",
-		"/var/cache/man/*",
-		"/var/cache/pacman/*",
-		"/var/db/sudo/*",
-		"/var/lib/alsa/asound.state",
-		"/var/lib/colord/*",
-		"/var/lib/dbus/machine-id",
-		"/var/lib/dhcpcd/*",
-		"/var/lib/dhcpcd/dhcpcd-eth0.lease",
-		"/var/lib/hwclock/adjtime",
-		"/var/lib/logrotate.status",
-		"/var/lib/misc/random-seed",
-		"/var/lib/mlocate/mlocate.db",
-		"/var/lib/pacman/*",
-		"/var/lib/postgres/data/*",
-		"/var/lib/random-seed",
-		"/var/lib/redis/appendonly.aof",
-		"/var/lib/redis/dump.rdb",
-		"/var/lib/sudo/*",
-		"/var/lib/syslog-ng/syslog-ng.persist",
-		"/var/lock",
-		"/var/log/*",
-		"/var/net-snmp/mib_indexes",
-		"/var/run",
-		"/var/spool/cronstamps/*",
-		"/var/spool/cups/*", /**/
-	}
-
-	if ad.QuickRun {
-		ad.IgnoreGlobs = append(
-			ad.IgnoreGlobs,
-			"/bin/*",
-			"/lib/*",
-			"/lib64/*",
-			"/media/*",
-			"/sbin/*",
-			"/usr/*", /**/
-		)
-	}
-
+	flag.StringVar(&ad.IgnoreFile, "ignore", "", "ignore file")
 	flag.Parse()
 	flagconfig.Parse()
 
