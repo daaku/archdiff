@@ -18,7 +18,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -229,25 +228,19 @@ func (ad *ArchDiff) UnpackagedFile() []File {
 
 func (ad *ArchDiff) RepoFile() []File {
 	if ad.repoFile == nil {
-
-		cmd := exec.Command("git", "ls-files")
-		cmd.Dir = ad.Repo
-		out, err := cmd.Output()
-		if err != nil {
-			log.Fatalf("Error listing repo files: %s", err)
-		}
-		buf := bytes.NewBuffer(out)
-		for {
-			line, err := buf.ReadString('\n')
+		filepath.Walk(ad.Repo, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				if err == io.EOF {
-					break
+				if !ad.Silent {
+					log.Printf("RepoFile Walk error: %s", err)
 				}
-				log.Fatalf("Error parsing repo listing: %s", err)
+				return nil
 			}
-			ad.repoFile = append(
-				ad.repoFile, File{Name: line[:len(line)-1]}) // drop trailing \n
-		}
+			if info.IsDir() {
+				return nil
+			}
+			ad.repoFile = append(ad.repoFile, File{Name: path})
+			return nil
+		})
 	}
 	return ad.repoFile
 }

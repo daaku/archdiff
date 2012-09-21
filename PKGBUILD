@@ -1,5 +1,5 @@
 pkgname=archdiff
-pkgver=1
+pkgver=2
 pkgrel=1
 pkgdesc="A tool to view a 'system' diff for Arch Linux systems."
 arch=(x86_64 i686)
