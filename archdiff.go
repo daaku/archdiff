@@ -238,7 +238,13 @@ func (ad *ArchDiff) RepoFile() []File {
 			if info.IsDir() {
 				return nil
 			}
-			ad.repoFile = append(ad.repoFile, File{Name: path})
+			name := strings.Replace(path, ad.Repo, "", 1)
+			if name[0] == '/' {
+				name = name[1:]
+			}
+			ad.repoFile = append(ad.repoFile, File{
+				Name: name,
+			})
 			return nil
 		})
 	}
