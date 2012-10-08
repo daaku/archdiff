@@ -12,7 +12,6 @@ import (
 	"flag"
 	"fmt"
 	"github.com/daaku/go-alpm"
-	"github.com/daaku/go.copyfile"
 	"github.com/daaku/go.flagconfig"
 	"io"
 	"io/ioutil"
@@ -31,7 +30,6 @@ type File struct {
 type ArchDiff struct {
 	Verbose    bool
 	Silent     bool
-	DryRun     bool
 	Root       string
 	DB         string
 	Repo       string
@@ -49,12 +47,6 @@ type ArchDiff struct {
 	repoFile           []File
 	diffRepoFile       []File
 	missingInRepo      []File
-}
-
-var cp = &copyfile.Copy{
-	KeepLinks: true,
-	Force:     true,
-	Clobber:   true,
 }
 
 func filehash(path string) (string, error) {
@@ -351,40 +343,12 @@ func olderNewer(aPath, bPath string) (older, newer string, err error) {
 	return aPath, bPath, nil
 }
 
-func (ad *ArchDiff) copyFile(dst, src string) {
-	if ad.DryRun {
-		fmt.Println("cp", src, dst)
-		return
-	}
-	_, err := cp.Single(dst, src)
-	if err != nil && !ad.Silent {
-		log.Printf("failed to copy file %s to %s: %s", src, dst, err)
-	}
-}
-
-func (ad *ArchDiff) CommandSync(args []string) {
-	for _, file := range ad.MissingInRepo() {
-		ad.copyFile(
-			filepath.Join(ad.Repo, file.Name),
-			filepath.Join(ad.Root, file.Name))
-	}
-	for _, file := range ad.DiffRepoFile() {
-		older, newer, err := olderNewer(
-			filepath.Join(ad.Root, file.Name),
-			filepath.Join(ad.Repo, file.Name))
-		if err != nil {
-			log.Fatalf("Failed to identify newer file: %s", err)
-		}
-		ad.copyFile(older, newer)
-	}
-}
-
 func (ad *ArchDiff) CommandUnknown(args []string) {
 	log.Fatalf("unknown command: %s", strings.Join(args, " "))
 }
 
 func (ad *ArchDiff) Usage() {
-	log.Fatalf("usage: archdiff [ls | status | sync]")
+	log.Fatalf("usage: archdiff [ls | status]")
 }
 
 func (ad *ArchDiff) Command(args []string) {
@@ -396,8 +360,6 @@ func (ad *ArchDiff) Command(args []string) {
 		ad.CommandLs(args)
 	case "status":
 		ad.CommandStatus(args)
-	case "sync":
-		ad.CommandSync(args)
 	default:
 		ad.CommandUnknown(args)
 	}
@@ -408,7 +370,6 @@ func main() {
 	flag.IntVar(&ad.MaxProcs, "max-procs", runtime.NumCPU()*2, "go max procs")
 	flag.BoolVar(&ad.Verbose, "verbose", false, "verbose")
 	flag.BoolVar(&ad.Silent, "silent", false, "suppress errors")
-	flag.BoolVar(&ad.DryRun, "f", true, "dry run")
 	flag.StringVar(&ad.Root, "root", "/", "set an alternate installation root")
 	flag.StringVar(
 		&ad.DB, "dbpath", "/var/lib/pacman", "set an alternate database location")
