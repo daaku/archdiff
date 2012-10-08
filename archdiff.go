@@ -406,7 +406,7 @@ func main() {
 	flag.StringVar(&ad.Root, "root", "/", "set an alternate installation root")
 	flag.StringVar(
 		&ad.DB, "dbpath", "/var/lib/pacman", "set an alternate database location")
-	flag.StringVar(&ad.Repo, "repo", "", "repo directory")
+	flag.StringVar(&ad.Repo, "repo", "/usr/share/archdiff", "repo directory")
 	flag.StringVar(&ad.IgnoreFile, "ignore", "", "ignore file")
 	flag.Parse()
 	flagconfig.Parse()
