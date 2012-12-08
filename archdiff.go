@@ -93,23 +93,42 @@ func filehash(path string) (string, error) {
 
 func (ad *ArchDiff) IgnoreGlob() []Glob {
 	if ad.ignoreGlob == nil && ad.IgnoreFile != "" {
-		content, err := ioutil.ReadFile(ad.IgnoreFile)
+		stat, err := os.Stat(ad.IgnoreFile)
 		if err != nil {
 			log.Fatalf("failed to read ignore file %s: %s", ad.IgnoreFile, err)
 		}
-		lines := bytes.Split(content, []byte{'\n'})
-		for _, r := range lines {
-			l := string(r)
-			if len(l) == 0 {
-				continue
+		files := []string{}
+		if stat.IsDir() {
+			infos, err := ioutil.ReadDir(ad.IgnoreFile)
+			if err != nil {
+				log.Fatalf("failed to read ignore directory %s: %s", ad.IgnoreFile, err)
 			}
-			if l[0] == '#' {
-				continue
+			for _, info := range infos {
+				files = append(files, filepath.Join(ad.IgnoreFile, info.Name()))
 			}
-			if strings.IndexAny(l, "*?[") > -1 {
-				ad.ignoreGlob = append(ad.ignoreGlob, realGlob(l))
-			} else {
-				ad.ignoreGlob = append(ad.ignoreGlob, prefixGlob(l))
+		} else {
+			files = []string{ad.IgnoreFile}
+		}
+
+		for _, file := range files {
+			content, err := ioutil.ReadFile(file)
+			if err != nil {
+				log.Fatalf("failed to read ignore file %s: %s", file, err)
+			}
+			lines := bytes.Split(content, []byte{'\n'})
+			for _, r := range lines {
+				l := string(r)
+				if len(l) == 0 {
+					continue
+				}
+				if l[0] == '#' {
+					continue
+				}
+				if strings.IndexAny(l, "*?[") > -1 {
+					ad.ignoreGlob = append(ad.ignoreGlob, realGlob(l))
+				} else {
+					ad.ignoreGlob = append(ad.ignoreGlob, prefixGlob(l))
+				}
 			}
 		}
 	}
