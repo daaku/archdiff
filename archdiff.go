@@ -29,6 +29,13 @@ type File struct {
 
 type FileList map[string]File
 
+type Glob interface {
+	Match(name string) bool
+}
+
+type realGlob string
+type prefixGlob string
+
 type ArchDiff struct {
 	Verbose    bool
 	Silent     bool
@@ -38,7 +45,7 @@ type ArchDiff struct {
 	IgnoreFile string
 	MaxProcs   int
 
-	ignoreGlob         []string
+	ignoreGlob         []Glob
 	backupFile         FileList
 	modifiedBackupFile FileList
 	localDb            *alpm.Db
@@ -60,6 +67,18 @@ func (l FileList) Contains(name string) bool {
 	return ok
 }
 
+func (g realGlob) Match(path string) bool {
+	matched, err := filepath.Match(string(g), path)
+	if err != nil {
+		log.Fatalf("Match error: %s", err)
+	}
+	return matched
+}
+
+func (g prefixGlob) Match(path string) bool {
+	return strings.HasPrefix(path, string(g))
+}
+
 func filehash(path string) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -71,7 +90,7 @@ func filehash(path string) (string, error) {
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
 
-func (ad *ArchDiff) IgnoreGlob() []string {
+func (ad *ArchDiff) IgnoreGlob() []Glob {
 	if ad.ignoreGlob == nil && ad.IgnoreFile != "" {
 		content, err := ioutil.ReadFile(ad.IgnoreFile)
 		if err != nil {
@@ -86,7 +105,11 @@ func (ad *ArchDiff) IgnoreGlob() []string {
 			if l[0] == '#' {
 				continue
 			}
-			ad.ignoreGlob = append(ad.ignoreGlob, l)
+			if strings.IndexAny(l, "*?[") > -1 {
+				ad.ignoreGlob = append(ad.ignoreGlob, realGlob(l))
+			} else {
+				ad.ignoreGlob = append(ad.ignoreGlob, prefixGlob(l))
+			}
 		}
 	}
 	return ad.ignoreGlob
@@ -94,11 +117,7 @@ func (ad *ArchDiff) IgnoreGlob() []string {
 
 func (ad *ArchDiff) IsIgnored(path string) bool {
 	for _, glob := range ad.IgnoreGlob() {
-		matched, err := filepath.Match(glob, path)
-		if err != nil {
-			log.Fatalf("Match error: %s", err)
-		}
-		if matched {
+		if glob.Match(path) {
 			return true
 		}
 	}
