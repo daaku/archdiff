@@ -27,6 +27,8 @@ type File struct {
 	Hash string
 }
 
+type FileList map[string]File
+
 type ArchDiff struct {
 	Verbose    bool
 	Silent     bool
@@ -37,16 +39,25 @@ type ArchDiff struct {
 	MaxProcs   int
 
 	ignoreGlob         []string
-	backupFile         []File
-	modifiedBackupFile []File
+	backupFile         FileList
+	modifiedBackupFile FileList
 	localDb            *alpm.Db
 	alpmHandle         *alpm.Handle
-	allPackageFile     []File
-	allFile            []File
-	unpackagedFile     []File
-	repoFile           []File
-	diffRepoFile       []File
-	missingInRepo      []File
+	allPackageFile     FileList
+	allFile            FileList
+	unpackagedFile     FileList
+	repoFile           FileList
+	diffRepoFile       FileList
+	missingInRepo      FileList
+}
+
+func (l FileList) Add(f File) {
+	l[f.Name] = f
+}
+
+func (l FileList) Contains(name string) bool {
+	_, ok := l[name]
+	return ok
 }
 
 func filehash(path string) (string, error) {
@@ -58,15 +69,6 @@ func filehash(path string) (string, error) {
 	h := md5.New()
 	io.Copy(h, file)
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
-}
-
-func contains(name string, list []File) bool {
-	for _, file := range list {
-		if file.Name == name {
-			return true
-		}
-	}
-	return false
 }
 
 func (ad *ArchDiff) IgnoreGlob() []string {
@@ -131,11 +133,12 @@ func (ad *ArchDiff) LocalDb() *alpm.Db {
 	return ad.localDb
 }
 
-func (ad *ArchDiff) BackupFile() []File {
+func (ad *ArchDiff) BackupFile() FileList {
 	if ad.backupFile == nil {
+		ad.backupFile = make(FileList)
 		ad.LocalDb().PkgCache().ForEach(func(pkg alpm.Package) error {
 			return pkg.Backup().ForEach(func(bf alpm.BackupFile) error {
-				ad.backupFile = append(ad.backupFile, File{Name: bf.Name, Hash: bf.Hash})
+				ad.backupFile[bf.Name] = File{Name: bf.Name, Hash: bf.Hash}
 				return nil
 			})
 		})
@@ -143,8 +146,9 @@ func (ad *ArchDiff) BackupFile() []File {
 	return ad.backupFile
 }
 
-func (ad *ArchDiff) AllFile() []File {
+func (ad *ArchDiff) AllFile() FileList {
 	if ad.allFile == nil {
+		ad.allFile = make(FileList)
 		filepath.Walk(
 			ad.Root,
 			func(path string, info os.FileInfo, err error) error {
@@ -166,18 +170,20 @@ func (ad *ArchDiff) AllFile() []File {
 					}
 					log.Fatalf("Error finding unpackaged file: %s", err)
 				}
-				ad.allFile = append(ad.allFile, File{Name: path[1:]})
+				name := path[1:]
+				ad.allFile.Add(File{Name: name})
 				return nil
 			})
 	}
 	return ad.allFile
 }
 
-func (ad *ArchDiff) AllPackageFile() []File {
+func (ad *ArchDiff) AllPackageFile() FileList {
 	if ad.allPackageFile == nil {
+		ad.allPackageFile = make(FileList)
 		ad.LocalDb().PkgCache().ForEach(func(pkg alpm.Package) error {
 			for _, file := range pkg.Files() {
-				ad.allPackageFile = append(ad.allPackageFile, File{Name: file.Name})
+				ad.allPackageFile.Add(File{Name: file.Name})
 			}
 			return nil
 		})
@@ -185,8 +191,9 @@ func (ad *ArchDiff) AllPackageFile() []File {
 	return ad.allPackageFile
 }
 
-func (ad *ArchDiff) ModifiedBackupFile() []File {
+func (ad *ArchDiff) ModifiedBackupFile() FileList {
 	if ad.modifiedBackupFile == nil {
+		ad.modifiedBackupFile = make(FileList)
 		for _, file := range ad.BackupFile() {
 			fullname := filepath.Join(ad.Root, file.Name)
 			if ad.IsIgnored(fullname) {
@@ -200,26 +207,28 @@ func (ad *ArchDiff) ModifiedBackupFile() []File {
 				continue
 			}
 			if actual != file.Hash {
-				ad.modifiedBackupFile = append(ad.modifiedBackupFile, file)
+				ad.modifiedBackupFile.Add(file)
 			}
 		}
 	}
 	return ad.modifiedBackupFile
 }
 
-func (ad *ArchDiff) UnpackagedFile() []File {
+func (ad *ArchDiff) UnpackagedFile() FileList {
 	if ad.unpackagedFile == nil {
+		ad.unpackagedFile = make(FileList)
 		for _, file := range ad.AllFile() {
-			if !contains(file.Name, ad.AllPackageFile()) {
-				ad.unpackagedFile = append(ad.unpackagedFile, file)
+			if !ad.AllPackageFile().Contains(file.Name) {
+				ad.unpackagedFile.Add(file)
 			}
 		}
 	}
 	return ad.unpackagedFile
 }
 
-func (ad *ArchDiff) RepoFile() []File {
+func (ad *ArchDiff) RepoFile() FileList {
 	if ad.repoFile == nil {
+		ad.repoFile = make(FileList)
 		filepath.Walk(ad.Repo, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				if !ad.Silent {
@@ -234,17 +243,16 @@ func (ad *ArchDiff) RepoFile() []File {
 			if name[0] == '/' {
 				name = name[1:]
 			}
-			ad.repoFile = append(ad.repoFile, File{
-				Name: name,
-			})
+			ad.repoFile.Add(File{Name: name})
 			return nil
 		})
 	}
 	return ad.repoFile
 }
 
-func (ad *ArchDiff) DiffRepoFile() []File {
+func (ad *ArchDiff) DiffRepoFile() FileList {
 	if ad.diffRepoFile == nil {
+		ad.diffRepoFile = make(FileList)
 		for _, file := range ad.RepoFile() {
 			realpath := filepath.Join(ad.Root, file.Name)
 			repopath := filepath.Join(ad.Repo, file.Name)
@@ -269,30 +277,31 @@ func (ad *ArchDiff) DiffRepoFile() []File {
 				log.Fatalf("Error looking for modified repo files (repo): %s", err)
 			}
 			if realhash != repohash {
-				ad.diffRepoFile = append(ad.diffRepoFile, file)
+				ad.diffRepoFile.Add(file)
 			}
 		}
 	}
 	return ad.diffRepoFile
 }
 
-func (ad *ArchDiff) MissingInRepo() []File {
+func (ad *ArchDiff) MissingInRepo() FileList {
 	if ad.missingInRepo == nil {
+		ad.missingInRepo = make(FileList)
 		for _, file := range ad.ModifiedBackupFile() {
-			if !contains(file.Name, ad.RepoFile()) {
-				ad.missingInRepo = append(ad.missingInRepo, file)
+			if !ad.RepoFile().Contains(file.Name) {
+				ad.missingInRepo.Add(file)
 			}
 		}
 		for _, file := range ad.UnpackagedFile() {
-			if !contains(file.Name, ad.RepoFile()) {
-				ad.missingInRepo = append(ad.missingInRepo, file)
+			if !ad.RepoFile().Contains(file.Name) {
+				ad.missingInRepo.Add(file)
 			}
 		}
 	}
 	return ad.missingInRepo
 }
 
-func (ad *ArchDiff) ListNamed(name string) []File {
+func (ad *ArchDiff) ListNamed(name string) FileList {
 	switch name {
 	case "missing-in-repo":
 		return ad.MissingInRepo()
