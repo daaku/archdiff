@@ -217,8 +217,9 @@ func (ad *ArchDiff) ModifiedBackupFile() FileList {
 func (ad *ArchDiff) UnpackagedFile() FileList {
 	if ad.unpackagedFile == nil {
 		ad.unpackagedFile = make(FileList)
+		allPackageFile := ad.AllPackageFile()
 		for _, file := range ad.AllFile() {
-			if !ad.AllPackageFile().Contains(file.Name) {
+			if !allPackageFile.Contains(file.Name) {
 				ad.unpackagedFile.Add(file)
 			}
 		}
@@ -287,13 +288,14 @@ func (ad *ArchDiff) DiffRepoFile() FileList {
 func (ad *ArchDiff) MissingInRepo() FileList {
 	if ad.missingInRepo == nil {
 		ad.missingInRepo = make(FileList)
+		repoFile := ad.RepoFile()
 		for _, file := range ad.ModifiedBackupFile() {
-			if !ad.RepoFile().Contains(file.Name) {
+			if !repoFile.Contains(file.Name) {
 				ad.missingInRepo.Add(file)
 			}
 		}
 		for _, file := range ad.UnpackagedFile() {
-			if !ad.RepoFile().Contains(file.Name) {
+			if !repoFile.Contains(file.Name) {
 				ad.missingInRepo.Add(file)
 			}
 		}
