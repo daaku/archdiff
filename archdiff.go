@@ -19,6 +19,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"runtime/pprof"
 	"strings"
 )
 
@@ -44,6 +45,7 @@ type ArchDiff struct {
 	Repo       string
 	IgnoreFile string
 	MaxProcs   int
+	CpuProfile string
 
 	ignoreGlob         []Glob
 	backupFile         FileList
@@ -405,8 +407,19 @@ func main() {
 		&ad.DB, "dbpath", "/var/lib/pacman", "set an alternate database location")
 	flag.StringVar(&ad.Repo, "repo", "/usr/share/archdiff", "repo directory")
 	flag.StringVar(&ad.IgnoreFile, "ignore", "", "ignore file")
+	flag.StringVar(&ad.CpuProfile, "cpuprofile", "", "write cpu profile to this file")
 	flag.Parse()
 	flagconfig.Parse()
+
+	if ad.CpuProfile != "" {
+		f, err := os.Create(ad.CpuProfile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer f.Close()
+		pprof.StartCPUProfile(f)
+		defer pprof.StopCPUProfile()
+	}
 
 	runtime.GOMAXPROCS(ad.MaxProcs)
 	ad.Command(flag.Args())
