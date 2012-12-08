@@ -38,7 +38,6 @@ type realGlob string
 type prefixGlob string
 
 type ArchDiff struct {
-	Verbose    bool
 	Silent     bool
 	Root       string
 	DB         string
@@ -400,7 +399,6 @@ func (ad *ArchDiff) Command(args []string) {
 func main() {
 	ad := &ArchDiff{}
 	flag.IntVar(&ad.MaxProcs, "max-procs", runtime.NumCPU()*2, "go max procs")
-	flag.BoolVar(&ad.Verbose, "verbose", false, "verbose")
 	flag.BoolVar(&ad.Silent, "silent", false, "suppress errors")
 	flag.StringVar(&ad.Root, "root", "/", "set an alternate installation root")
 	flag.StringVar(
