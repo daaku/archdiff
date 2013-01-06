@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"runtime/pprof"
+	"sort"
 	"strings"
 )
 
@@ -63,10 +64,35 @@ func (l FileList) Add(f File) {
 	l[f.Name] = f
 }
 
+func (l FileList) Append(l2 FileList) {
+	for _, f := range l2 {
+		l.Add(f)
+	}
+}
+
 func (l FileList) Contains(name string) bool {
 	_, ok := l[name]
 	return ok
 }
+
+func (l FileList) List() (f []File) {
+	for _, file := range l {
+		f = append(f, file)
+	}
+	return f
+}
+
+func (l FileList) Sorted() []File {
+	s := FileByName(l.List())
+	sort.Sort(s)
+	return s
+}
+
+type FileByName []File
+
+func (p FileByName) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
+func (p FileByName) Len() int           { return len(p) }
+func (p FileByName) Less(i, j int) bool { return p[i].Name < p[j].Name }
 
 func (g realGlob) Match(path string) bool {
 	matched, err := filepath.Match(string(g), path)
@@ -366,10 +392,10 @@ func main() {
 	}
 
 	runtime.GOMAXPROCS(ad.MaxProcs)
-	for _, file := range ad.MissingInRepo() {
-		fmt.Printf("/%s\n", file.Name)
-	}
-	for _, file := range ad.DiffRepoFile() {
+
+	files := ad.MissingInRepo()
+	files.Append(ad.DiffRepoFile())
+	for _, file := range files.Sorted() {
 		fmt.Printf("/%s\n", file.Name)
 	}
 }
