@@ -342,79 +342,6 @@ func (ad *ArchDiff) MissingInRepo() FileList {
 	return ad.missingInRepo
 }
 
-func (ad *ArchDiff) ListNamed(name string) FileList {
-	switch name {
-	case "missing-in-repo":
-		return ad.MissingInRepo()
-	case "different-in-repo":
-		return ad.DiffRepoFile()
-	case "package-backups":
-		return ad.BackupFile()
-	case "all":
-		return ad.AllFile()
-	case "package":
-		return ad.AllPackageFile()
-	case "modified-backups":
-		return ad.ModifiedBackupFile()
-	case "unpackaged":
-		return ad.UnpackagedFile()
-	case "repo":
-		return ad.RepoFile()
-	}
-	log.Fatalf("unknown list name: %s", name)
-	panic("not reached")
-}
-
-func (ad *ArchDiff) CommandLs(args []string) {
-	for _, name := range args[1:] {
-		fmt.Println(name)
-		for _, file := range ad.ListNamed(name) {
-			fmt.Println(" ", file.Name)
-		}
-	}
-}
-
-func (ad *ArchDiff) CommandStatus(args []string) {
-	ad.CommandLs([]string{"ls", "missing-in-repo", "different-in-repo"})
-}
-
-func olderNewer(aPath, bPath string) (older, newer string, err error) {
-	aStat, err := os.Stat(aPath)
-	if err != nil {
-		return "", "", err
-	}
-	bStat, err := os.Stat(bPath)
-	if err != nil {
-		return "", "", err
-	}
-	if aStat.ModTime().After(bStat.ModTime()) {
-		return bPath, aPath, nil
-	}
-	return aPath, bPath, nil
-}
-
-func (ad *ArchDiff) CommandUnknown(args []string) {
-	log.Fatalf("unknown command: %s", strings.Join(args, " "))
-}
-
-func (ad *ArchDiff) Usage() {
-	log.Fatalf("usage: archdiff [ls | status]")
-}
-
-func (ad *ArchDiff) Command(args []string) {
-	if len(args) == 0 {
-		ad.Usage()
-	}
-	switch args[0] {
-	case "ls":
-		ad.CommandLs(args)
-	case "status":
-		ad.CommandStatus(args)
-	default:
-		ad.CommandUnknown(args)
-	}
-}
-
 func main() {
 	ad := &ArchDiff{}
 	flag.IntVar(&ad.MaxProcs, "max-procs", runtime.NumCPU()*2, "go max procs")
@@ -439,5 +366,10 @@ func main() {
 	}
 
 	runtime.GOMAXPROCS(ad.MaxProcs)
-	ad.Command(flag.Args())
+	for _, file := range ad.MissingInRepo() {
+		fmt.Printf("/%s\n", file.Name)
+	}
+	for _, file := range ad.DiffRepoFile() {
+		fmt.Printf("/%s\n", file.Name)
+	}
 }
