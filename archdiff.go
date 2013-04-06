@@ -103,10 +103,10 @@ func (g realGlob) Match(path string) bool {
 }
 
 func (g simpleGlob) Match(path string) bool {
-  if path == string(g) {
-    return true
-  }
-  return strings.HasPrefix(path, string(g) + "/")
+	if path == string(g) {
+		return true
+	}
+	return strings.HasPrefix(path, string(g)+"/")
 }
 
 func filehash(path string) (string, error) {
