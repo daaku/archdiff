@@ -11,7 +11,7 @@ import (
 	"crypto/md5"
 	"flag"
 	"fmt"
-	"github.com/daaku/go-alpm"
+	"github.com/daaku/go.alpm"
 	"github.com/daaku/go.flagconfig"
 	"io"
 	"io/ioutil"
