@@ -11,8 +11,6 @@ import (
 	"crypto/md5"
 	"flag"
 	"fmt"
-	"github.com/daaku/go.alpm"
-	"github.com/daaku/go.flagconfig"
 	"io"
 	"io/ioutil"
 	"log"
@@ -22,6 +20,9 @@ import (
 	"runtime/pprof"
 	"sort"
 	"strings"
+
+	"github.com/daaku/go.alpm"
+	"github.com/daaku/go.flagconfig"
 )
 
 type File struct {
@@ -267,6 +268,9 @@ func (ad *ArchDiff) ModifiedBackupFile() FileList {
 			if ad.IsIgnored(fullname) {
 				continue
 			}
+			if _, err := os.Stat(fullname); os.IsNotExist(err) {
+				continue
+			}
 			actual, err := filehash(fullname)
 			if err != nil {
 				if !ad.Silent {
@@ -383,6 +387,7 @@ func main() {
 	flag.StringVar(&ad.CpuProfile, "cpuprofile", "", "write cpu profile to this file")
 	flag.Parse()
 	flagconfig.Parse()
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	if ad.CpuProfile != "" {
 		f, err := os.Create(ad.CpuProfile)
