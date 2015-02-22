@@ -22,7 +22,7 @@ import (
 	"strings"
 
 	"github.com/daaku/go.alpm"
-	"github.com/daaku/go.flagconfig"
+	"github.com/facebookgo/flagconfig"
 )
 
 type File struct {
@@ -221,15 +221,6 @@ func (ad *ArchDiff) AllFile() FileList {
 		filepath.Walk(
 			ad.Root,
 			func(path string, info os.FileInfo, err error) error {
-				if ad.IsIgnored(path) {
-					if info.IsDir() {
-						return filepath.SkipDir
-					}
-					return nil
-				}
-				if info.IsDir() {
-					return nil
-				}
 				if err != nil {
 					if os.IsPermission(err) {
 						if !ad.Silent {
@@ -238,6 +229,15 @@ func (ad *ArchDiff) AllFile() FileList {
 						return nil
 					}
 					log.Fatalf("Error finding unpackaged file: %s", err)
+				}
+				if ad.IsIgnored(path) {
+					if info.IsDir() {
+						return filepath.SkipDir
+					}
+					return nil
+				}
+				if info.IsDir() {
+					return nil
 				}
 				name := path[1:]
 				ad.allFile.Add(File{Name: name})
