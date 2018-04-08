@@ -1,3 +1,4 @@
 *.xz
+/archdiff
 /pkg/
 /src/
