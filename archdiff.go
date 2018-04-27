@@ -383,7 +383,7 @@ func main() {
 	flag.StringVar(
 		&ad.DB, "dbpath", "/var/lib/pacman", "set an alternate database location")
 	flag.StringVar(&ad.Repo, "repo", "/usr/share/archdiff", "repo directory")
-	flag.StringVar(&ad.IgnoreFile, "ignore", "", "ignore file")
+	flag.StringVar(&ad.IgnoreFile, "ignore", "/etc/archdiff/ignore", "ignore file")
 	flag.StringVar(&ad.CpuProfile, "cpuprofile", "", "write cpu profile to this file")
 	flag.Parse()
 	flagconfig.Parse()
