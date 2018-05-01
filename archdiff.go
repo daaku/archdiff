@@ -57,7 +57,7 @@ func contains(a []string, x string) bool {
 	return a[i] == x
 }
 
-type ArchDiff struct {
+type App struct {
 	Root       string
 	DB         string
 	Repo       string
@@ -77,9 +77,9 @@ type ArchDiff struct {
 	diffRepoFile       []string
 }
 
-func (ad *ArchDiff) buildIgnoreGlob() error {
+func (a *App) buildIgnoreGlob() error {
 	return errors.WithStack(filepath.Walk(
-		ad.IgnoreDir,
+		a.IgnoreDir,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return errors.WithStack(err)
@@ -107,9 +107,9 @@ func (ad *ArchDiff) buildIgnoreGlob() error {
 					if err != nil {
 						return errors.WithStack(err)
 					}
-					ad.ignoreGlob = append(ad.ignoreGlob, g)
+					a.ignoreGlob = append(a.ignoreGlob, g)
 				} else {
-					ad.ignoreGlob = append(ad.ignoreGlob, simpleGlob(l))
+					a.ignoreGlob = append(a.ignoreGlob, simpleGlob(l))
 				}
 			}
 			return errors.WithStack(sc.Err())
@@ -117,8 +117,8 @@ func (ad *ArchDiff) buildIgnoreGlob() error {
 	))
 }
 
-func (ad *ArchDiff) isIgnored(path string) bool {
-	for _, glob := range ad.ignoreGlob {
+func (a *App) isIgnored(path string) bool {
+	for _, glob := range a.ignoreGlob {
 		if glob.Match(path) {
 			return true
 		}
@@ -126,24 +126,24 @@ func (ad *ArchDiff) isIgnored(path string) bool {
 	return false
 }
 
-func (ad *ArchDiff) initAlpm() error {
+func (a *App) initAlpm() error {
 	var err error
-	ad.alpm, err = alpm.Init(ad.Root, ad.DB)
+	a.alpm, err = alpm.Init(a.Root, a.DB)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	ad.localDB, err = ad.alpm.LocalDb()
+	a.localDB, err = a.alpm.LocalDb()
 	return errors.WithStack(err)
 }
 
-func (ad *ArchDiff) buildAllFile() error {
+func (a *App) buildAllFile() error {
 	return errors.WithStack(filepath.Walk(
-		ad.Root,
+		a.Root,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return errors.WithStack(err)
 			}
-			if ad.isIgnored(path) {
+			if a.isIgnored(path) {
 				if info.IsDir() {
 					return filepath.SkipDir
 				}
@@ -152,35 +152,35 @@ func (ad *ArchDiff) buildAllFile() error {
 			if info.IsDir() {
 				return nil
 			}
-			ad.allFile = append(ad.allFile, path)
+			a.allFile = append(a.allFile, path)
 			return nil
 		}))
 }
 
-func (ad *ArchDiff) buildPackageFile() error {
-	err := ad.localDB.PkgCache().ForEach(func(pkg alpm.Package) error {
+func (a *App) buildPackageFile() error {
+	err := a.localDB.PkgCache().ForEach(func(pkg alpm.Package) error {
 		for _, file := range pkg.Files() {
-			ad.packageFile = append(ad.packageFile, filepath.Join("/", file.Name))
+			a.packageFile = append(a.packageFile, filepath.Join("/", file.Name))
 		}
 		return nil
 	})
-	sort.Strings(ad.packageFile)
+	sort.Strings(a.packageFile)
 	return errors.WithStack(err)
 }
 
-func (ad *ArchDiff) buildBackupFile() error {
-	ad.backupFile = make(map[string]string)
+func (a *App) buildBackupFile() error {
+	a.backupFile = make(map[string]string)
 	return errors.WithStack(
-		ad.localDB.PkgCache().ForEach(func(pkg alpm.Package) error {
+		a.localDB.PkgCache().ForEach(func(pkg alpm.Package) error {
 			return pkg.Backup().ForEach(func(bf alpm.BackupFile) error {
-				ad.backupFile[filepath.Join("/", bf.Name)] = bf.Hash
+				a.backupFile[filepath.Join("/", bf.Name)] = bf.Hash
 				return nil
 			})
 		}))
 }
 
-func (ad *ArchDiff) buildRepoFile() error {
-	err := filepath.Walk(ad.Repo,
+func (a *App) buildRepoFile() error {
+	err := filepath.Walk(a.Repo,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				return nil
@@ -188,30 +188,30 @@ func (ad *ArchDiff) buildRepoFile() error {
 			if info.IsDir() {
 				return nil
 			}
-			name := strings.Replace(path, ad.Repo, "", 1)
-			ad.repoFile = append(ad.repoFile, name)
+			name := strings.Replace(path, a.Repo, "", 1)
+			a.repoFile = append(a.repoFile, name)
 			return nil
 		})
-	sort.Strings(ad.repoFile)
+	sort.Strings(a.repoFile)
 	return errors.WithStack(err)
 }
 
-func (ad *ArchDiff) buildUnpackagedFile() error {
-	for _, file := range ad.allFile {
-		if !contains(ad.packageFile, file) {
-			ad.unpackagedFile = append(ad.unpackagedFile, file)
+func (a *App) buildUnpackagedFile() error {
+	for _, file := range a.allFile {
+		if !contains(a.packageFile, file) {
+			a.unpackagedFile = append(a.unpackagedFile, file)
 		}
 	}
 	return nil
 }
 
-func (ad *ArchDiff) buildModifiedBackupFile() error {
-	for file, hash := range ad.backupFile {
-		if contains(ad.repoFile, file) {
+func (a *App) buildModifiedBackupFile() error {
+	for file, hash := range a.backupFile {
+		if contains(a.repoFile, file) {
 			continue
 		}
-		fullname := filepath.Join(ad.Root, file)
-		if ad.isIgnored(fullname) {
+		fullname := filepath.Join(a.Root, file)
+		if a.isIgnored(fullname) {
 			continue
 		}
 		if _, err := os.Stat(fullname); os.IsNotExist(err) {
@@ -222,16 +222,16 @@ func (ad *ArchDiff) buildModifiedBackupFile() error {
 			return errors.WithStack(err)
 		}
 		if actual != hash {
-			ad.modifiedBackupFile = append(ad.modifiedBackupFile, file)
+			a.modifiedBackupFile = append(a.modifiedBackupFile, file)
 		}
 	}
 	return nil
 }
 
-func (ad *ArchDiff) buildDiffRepoFile() error {
-	for _, file := range ad.repoFile {
-		realpath := filepath.Join(ad.Root, file)
-		repopath := filepath.Join(ad.Repo, file)
+func (a *App) buildDiffRepoFile() error {
+	for _, file := range a.repoFile {
+		realpath := filepath.Join(a.Root, file)
+		repopath := filepath.Join(a.Repo, file)
 		realhash, err := filehash(realpath)
 		if err != nil && !os.IsNotExist(err) {
 			return errors.WithStack(err)
@@ -241,25 +241,25 @@ func (ad *ArchDiff) buildDiffRepoFile() error {
 			return errors.WithStack(err)
 		}
 		if realhash != repohash {
-			ad.diffRepoFile = append(ad.diffRepoFile, file)
+			a.diffRepoFile = append(a.diffRepoFile, file)
 		}
 	}
 	return nil
 }
 
 func Main() error {
-	var ad ArchDiff
-	flag.StringVar(&ad.Root, "root", "/", "set an alternate installation root")
+	var app App
+	flag.StringVar(&app.Root, "root", "/", "set an alternate installation root")
 	flag.StringVar(
-		&ad.DB, "dbpath", "/var/lib/pacman", "set an alternate database location")
-	flag.StringVar(&ad.Repo, "repo", "/usr/share/archdiff", "repo directory")
-	flag.StringVar(&ad.IgnoreDir, "ignore", "/etc/archdiff/ignore",
+		&app.DB, "dbpath", "/var/lib/pacman", "set an alternate database location")
+	flag.StringVar(&app.Repo, "repo", "/usr/share/archdiff", "repo directory")
+	flag.StringVar(&app.IgnoreDir, "ignore", "/etc/archdiff/ignore",
 		"directory of ignore files")
-	flag.StringVar(&ad.CpuProfile, "cpuprofile", "", "write cpu profile here")
+	flag.StringVar(&app.CpuProfile, "cpuprofile", "", "write cpu profile here")
 	flag.Parse()
 
-	if ad.CpuProfile != "" {
-		f, err := os.Create(ad.CpuProfile)
+	if app.CpuProfile != "" {
+		f, err := os.Create(app.CpuProfile)
 		if err != nil {
 			return errors.WithStack(err)
 		}
@@ -269,15 +269,15 @@ func Main() error {
 	}
 
 	steps := []func() error{
-		ad.initAlpm,
-		ad.buildIgnoreGlob,
-		ad.buildAllFile,
-		ad.buildPackageFile,
-		ad.buildBackupFile,
-		ad.buildRepoFile,
-		ad.buildUnpackagedFile,
-		ad.buildModifiedBackupFile,
-		ad.buildDiffRepoFile,
+		app.initAlpm,
+		app.buildIgnoreGlob,
+		app.buildAllFile,
+		app.buildPackageFile,
+		app.buildBackupFile,
+		app.buildRepoFile,
+		app.buildUnpackagedFile,
+		app.buildModifiedBackupFile,
+		app.buildDiffRepoFile,
 	}
 	for _, step := range steps {
 		if err := step(); err != nil {
@@ -286,10 +286,10 @@ func Main() error {
 	}
 
 	diff := make([]string, 0,
-		len(ad.unpackagedFile)+len(ad.diffRepoFile)+len(ad.modifiedBackupFile))
-	diff = append(diff, ad.unpackagedFile...)
-	diff = append(diff, ad.diffRepoFile...)
-	diff = append(diff, ad.modifiedBackupFile...)
+		len(app.unpackagedFile)+len(app.diffRepoFile)+len(app.modifiedBackupFile))
+	diff = append(diff, app.unpackagedFile...)
+	diff = append(diff, app.diffRepoFile...)
+	diff = append(diff, app.modifiedBackupFile...)
 	sort.Strings(diff)
 
 	for _, file := range diff {
