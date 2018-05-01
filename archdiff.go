@@ -7,12 +7,11 @@
 package main
 
 import (
-	"bytes"
+	"bufio"
 	"crypto/md5"
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -21,84 +20,15 @@ import (
 	"strings"
 
 	"github.com/daaku/go.alpm"
+	"github.com/gobwas/glob"
+	"github.com/pkg/errors"
 )
-
-type File struct {
-	Name string
-	Hash string
-}
-
-type FileList map[string]File
 
 type Glob interface {
 	Match(name string) bool
 }
 
-type realGlob string
 type simpleGlob string
-
-type ArchDiff struct {
-	Silent     bool
-	Root       string
-	DB         string
-	Repo       string
-	IgnoreFile string
-	CpuProfile string
-
-	ignoreGlob         []Glob
-	backupFile         FileList
-	modifiedBackupFile FileList
-	localDb            *alpm.Db
-	alpmHandle         *alpm.Handle
-	allPackageFile     FileList
-	allFile            FileList
-	unpackagedFile     FileList
-	repoFile           FileList
-	diffRepoFile       FileList
-	missingInRepo      FileList
-}
-
-func (l FileList) Add(f File) {
-	l[f.Name] = f
-}
-
-func (l FileList) Append(l2 FileList) {
-	for _, f := range l2 {
-		l.Add(f)
-	}
-}
-
-func (l FileList) Contains(name string) bool {
-	_, ok := l[name]
-	return ok
-}
-
-func (l FileList) List() (f []File) {
-	for _, file := range l {
-		f = append(f, file)
-	}
-	return f
-}
-
-func (l FileList) Sorted() []File {
-	s := FileByName(l.List())
-	sort.Sort(s)
-	return s
-}
-
-type FileByName []File
-
-func (p FileByName) Swap(i, j int)      { p[i], p[j] = p[j], p[i] }
-func (p FileByName) Len() int           { return len(p) }
-func (p FileByName) Less(i, j int) bool { return p[i].Name < p[j].Name }
-
-func (g realGlob) Match(path string) bool {
-	matched, err := filepath.Match(string(g), path)
-	if err != nil {
-		log.Fatalf("Match error: %s", err)
-	}
-	return matched
-}
 
 func (g simpleGlob) Match(path string) bool {
 	if path == string(g) {
@@ -110,41 +40,64 @@ func (g simpleGlob) Match(path string) bool {
 func filehash(path string) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		return "", err
+		return "", errors.WithStack(err)
 	}
 	defer file.Close()
 	h := md5.New()
-	io.Copy(h, file)
+	if _, err := io.Copy(h, file); err != nil {
+		return "", errors.WithStack(err)
+	}
 	return fmt.Sprintf("%x", h.Sum(nil)), nil
 }
 
-func (ad *ArchDiff) IgnoreGlob() []Glob {
-	if ad.ignoreGlob == nil && ad.IgnoreFile != "" {
-		stat, err := os.Stat(ad.IgnoreFile)
-		if err != nil {
-			log.Fatalf("failed to read ignore file %s: %s", ad.IgnoreFile, err)
-		}
-		files := []string{}
-		if stat.IsDir() {
-			infos, err := ioutil.ReadDir(ad.IgnoreFile)
-			if err != nil {
-				log.Fatalf("failed to read ignore directory %s: %s", ad.IgnoreFile, err)
-			}
-			for _, info := range infos {
-				files = append(files, filepath.Join(ad.IgnoreFile, info.Name()))
-			}
-		} else {
-			files = []string{ad.IgnoreFile}
-		}
+func contains(a []string, x string) bool {
+	i := sort.SearchStrings(a, x)
+	if i == len(a) {
+		return false
+	}
+	return a[i] == x
+}
 
-		for _, file := range files {
-			content, err := ioutil.ReadFile(file)
+type ArchDiff struct {
+	Silent     bool
+	Root       string
+	DB         string
+	Repo       string
+	IgnoreDir  string
+	CpuProfile string
+
+	localDB *alpm.Db
+	alpm    *alpm.Handle
+
+	ignoreGlob         []Glob
+	backupFile         map[string]string
+	allFile            []string
+	packageFile        []string
+	repoFile           []string
+	modifiedBackupFile []string
+	unpackagedFile     []string
+	diffRepoFile       []string
+}
+
+func (ad *ArchDiff) buildIgnoreGlob() error {
+	return errors.WithStack(filepath.Walk(
+		ad.IgnoreDir,
+		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				log.Fatalf("failed to read ignore file %s: %s", file, err)
+				return errors.WithStack(err)
 			}
-			lines := bytes.Split(content, []byte{'\n'})
-			for _, r := range lines {
-				l := string(r)
+			if info.IsDir() {
+				return nil
+			}
+			f, err := os.Open(path)
+			if err != nil {
+				return errors.WithStack(err)
+			}
+			defer f.Close()
+
+			sc := bufio.NewScanner(f)
+			for sc.Scan() {
+				l := sc.Text()
 				if len(l) == 0 {
 					continue
 				}
@@ -152,18 +105,22 @@ func (ad *ArchDiff) IgnoreGlob() []Glob {
 					continue
 				}
 				if strings.IndexAny(l, "*?[") > -1 {
-					ad.ignoreGlob = append(ad.ignoreGlob, realGlob(l))
+					g, err := glob.Compile(l)
+					if err != nil {
+						return errors.WithStack(err)
+					}
+					ad.ignoreGlob = append(ad.ignoreGlob, g)
 				} else {
 					ad.ignoreGlob = append(ad.ignoreGlob, simpleGlob(l))
 				}
 			}
-		}
-	}
-	return ad.ignoreGlob
+			return errors.WithStack(sc.Err())
+		},
+	))
 }
 
 func (ad *ArchDiff) IsIgnored(path string) bool {
-	for _, glob := range ad.IgnoreGlob() {
+	for _, glob := range ad.ignoreGlob {
 		if glob.Match(path) {
 			return true
 		}
@@ -171,135 +128,68 @@ func (ad *ArchDiff) IsIgnored(path string) bool {
 	return false
 }
 
-func (ad *ArchDiff) Alpm() *alpm.Handle {
-	if ad.alpmHandle == nil {
-		var err error
-		ad.alpmHandle, err = alpm.Init(ad.Root, ad.DB)
-		if err != nil {
-			log.Fatalf("Failed to initialize pacman: %s", err)
-		}
+func (ad *ArchDiff) initAlpm() error {
+	var err error
+	ad.alpm, err = alpm.Init(ad.Root, ad.DB)
+	if err != nil {
+		return errors.WithStack(err)
 	}
-	return ad.alpmHandle
+	ad.localDB, err = ad.alpm.LocalDb()
+	return errors.WithStack(err)
 }
 
-func (ad *ArchDiff) Release() {
-	if ad.alpmHandle != nil {
-		ad.alpmHandle.Release()
-	}
-}
-
-func (ad *ArchDiff) LocalDb() *alpm.Db {
-	if ad.localDb == nil {
-		var err error
-		ad.localDb, err = ad.Alpm().LocalDb()
-		if err != nil {
-			log.Fatalf("Error loading local DB: %s", err)
-		}
-	}
-	return ad.localDb
-}
-
-func (ad *ArchDiff) BackupFile() FileList {
-	if ad.backupFile == nil {
-		ad.backupFile = make(FileList)
-		ad.LocalDb().PkgCache().ForEach(func(pkg alpm.Package) error {
-			return pkg.Backup().ForEach(func(bf alpm.BackupFile) error {
-				ad.backupFile[bf.Name] = File{Name: bf.Name, Hash: bf.Hash}
-				return nil
-			})
-		})
-	}
-	return ad.backupFile
-}
-
-func (ad *ArchDiff) AllFile() FileList {
-	if ad.allFile == nil {
-		ad.allFile = make(FileList)
-		filepath.Walk(
-			ad.Root,
-			func(path string, info os.FileInfo, err error) error {
-				if err != nil {
-					if os.IsPermission(err) {
-						if !ad.Silent {
-							log.Printf("Skipping file: %s", err)
-						}
-						return nil
-					}
-					log.Fatalf("Error finding unpackaged file: %s", err)
-				}
-				if ad.IsIgnored(path) {
-					if info.IsDir() {
-						return filepath.SkipDir
-					}
-					return nil
-				}
-				if info.IsDir() {
-					return nil
-				}
-				name := path[1:]
-				ad.allFile.Add(File{Name: name})
-				return nil
-			})
-	}
-	return ad.allFile
-}
-
-func (ad *ArchDiff) AllPackageFile() FileList {
-	if ad.allPackageFile == nil {
-		ad.allPackageFile = make(FileList)
-		ad.LocalDb().PkgCache().ForEach(func(pkg alpm.Package) error {
-			for _, file := range pkg.Files() {
-				ad.allPackageFile.Add(File{Name: file.Name})
-			}
-			return nil
-		})
-	}
-	return ad.allPackageFile
-}
-
-func (ad *ArchDiff) ModifiedBackupFile() FileList {
-	if ad.modifiedBackupFile == nil {
-		ad.modifiedBackupFile = make(FileList)
-		for _, file := range ad.BackupFile() {
-			fullname := filepath.Join(ad.Root, file.Name)
-			if ad.IsIgnored(fullname) {
-				continue
-			}
-			if _, err := os.Stat(fullname); os.IsNotExist(err) {
-				continue
-			}
-			actual, err := filehash(fullname)
+func (ad *ArchDiff) buildAllFile() error {
+	return errors.WithStack(filepath.Walk(
+		ad.Root,
+		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				if !ad.Silent {
-					log.Printf("Error calculating current hash: %s", err)
+				if os.IsPermission(err) {
+					if !ad.Silent {
+						log.Printf("Skipping file: %s", err)
+					}
+					return nil
 				}
-				continue
+				return errors.WithStack(err)
 			}
-			if actual != file.Hash {
-				ad.modifiedBackupFile.Add(file)
+			if ad.IsIgnored(path) {
+				if info.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
 			}
-		}
-	}
-	return ad.modifiedBackupFile
+			if info.IsDir() {
+				return nil
+			}
+			ad.allFile = append(ad.allFile, path)
+			return nil
+		}))
 }
 
-func (ad *ArchDiff) UnpackagedFile() FileList {
-	if ad.unpackagedFile == nil {
-		ad.unpackagedFile = make(FileList)
-		allPackageFile := ad.AllPackageFile()
-		for _, file := range ad.AllFile() {
-			if !allPackageFile.Contains(file.Name) {
-				ad.unpackagedFile.Add(file)
-			}
+func (ad *ArchDiff) buildPackageFile() error {
+	err := ad.localDB.PkgCache().ForEach(func(pkg alpm.Package) error {
+		for _, file := range pkg.Files() {
+			ad.packageFile = append(ad.packageFile, filepath.Join("/", file.Name))
 		}
-	}
-	return ad.unpackagedFile
+		return nil
+	})
+	sort.Strings(ad.packageFile)
+	return errors.WithStack(err)
 }
 
-func (ad *ArchDiff) RepoFile() FileList {
-	if ad.repoFile == nil {
-		ad.repoFile = make(FileList)
-		filepath.Walk(ad.Repo, func(path string, info os.FileInfo, err error) error {
+func (ad *ArchDiff) buildBackupFile() error {
+	ad.backupFile = make(map[string]string)
+	return errors.WithStack(
+		ad.localDB.PkgCache().ForEach(func(pkg alpm.Package) error {
+			return pkg.Backup().ForEach(func(bf alpm.BackupFile) error {
+				ad.backupFile[filepath.Join("/", bf.Name)] = bf.Hash
+				return nil
+			})
+		}))
+}
+
+func (ad *ArchDiff) buildRepoFile() error {
+	err := filepath.Walk(ad.Repo,
+		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
 				if !ad.Silent {
 					log.Printf("RepoFile Walk error: %s", err)
@@ -310,92 +200,138 @@ func (ad *ArchDiff) RepoFile() FileList {
 				return nil
 			}
 			name := strings.Replace(path, ad.Repo, "", 1)
-			if name[0] == '/' {
-				name = name[1:]
-			}
-			ad.repoFile.Add(File{Name: name})
+			ad.repoFile = append(ad.repoFile, name)
 			return nil
 		})
-	}
-	return ad.repoFile
+	sort.Strings(ad.repoFile)
+	return errors.WithStack(err)
 }
 
-func (ad *ArchDiff) DiffRepoFile() FileList {
-	if ad.diffRepoFile == nil {
-		ad.diffRepoFile = make(FileList)
-		for _, file := range ad.RepoFile() {
-			realpath := filepath.Join(ad.Root, file.Name)
-			repopath := filepath.Join(ad.Repo, file.Name)
-			realhash, err := filehash(realpath)
-			if err != nil && !os.IsNotExist(err) {
-				if os.IsPermission(err) {
-					if !ad.Silent {
-						log.Printf("Skipping file: %s", err)
-					}
-					continue
+func (ad *ArchDiff) buildUnpackagedFile() error {
+	for _, file := range ad.allFile {
+		if !contains(ad.packageFile, file) {
+			ad.unpackagedFile = append(ad.unpackagedFile, file)
+		}
+	}
+	return nil
+}
+
+func (ad *ArchDiff) buildModifiedBackupFile() error {
+	for file, hash := range ad.backupFile {
+		if contains(ad.repoFile, file) {
+			continue
+		}
+		fullname := filepath.Join(ad.Root, file)
+		if ad.IsIgnored(fullname) {
+			continue
+		}
+		if _, err := os.Stat(fullname); os.IsNotExist(err) {
+			continue
+		}
+		actual, err := filehash(fullname)
+		if err != nil {
+			if os.IsPermission(errors.Cause(err)) {
+				if !ad.Silent {
+					log.Printf("Skipping file: %s", err)
 				}
-				log.Fatalf("Error looking for modified repo files (real): %s", err)
+				continue
 			}
-			repohash, err := filehash(repopath)
-			if err != nil && !os.IsNotExist(err) {
-				if os.IsPermission(err) {
-					if !ad.Silent {
-						log.Printf("Skipping file: %s", err)
-					}
-					continue
+			return errors.WithStack(err)
+		}
+		if actual != hash {
+			ad.modifiedBackupFile = append(ad.modifiedBackupFile, file)
+		}
+	}
+	return nil
+}
+
+func (ad *ArchDiff) buildDiffRepoFile() error {
+	for _, file := range ad.repoFile {
+		realpath := filepath.Join(ad.Root, file)
+		repopath := filepath.Join(ad.Repo, file)
+		realhash, err := filehash(realpath)
+		if err != nil && !os.IsNotExist(err) {
+			if os.IsPermission(err) {
+				if !ad.Silent {
+					log.Printf("Skipping file: %s", err)
 				}
-				log.Fatalf("Error looking for modified repo files (repo): %s", err)
+				continue
 			}
-			if realhash != repohash {
-				ad.diffRepoFile.Add(file)
+			return errors.WithStack(err)
+		}
+		repohash, err := filehash(repopath)
+		if err != nil && !os.IsNotExist(err) {
+			if os.IsPermission(err) {
+				if !ad.Silent {
+					log.Printf("Skipping file: %s", err)
+				}
+				continue
 			}
+			return errors.WithStack(err)
+		}
+		if realhash != repohash {
+			ad.diffRepoFile = append(ad.diffRepoFile, file)
 		}
 	}
-	return ad.diffRepoFile
+	return nil
 }
 
-func (ad *ArchDiff) MissingInRepo() FileList {
-	if ad.missingInRepo == nil {
-		ad.missingInRepo = make(FileList)
-		repoFile := ad.RepoFile()
-		for _, file := range ad.ModifiedBackupFile() {
-			if !repoFile.Contains(file.Name) {
-				ad.missingInRepo.Add(file)
-			}
-		}
-		for _, file := range ad.UnpackagedFile() {
-			if !repoFile.Contains(file.Name) {
-				ad.missingInRepo.Add(file)
-			}
-		}
-	}
-	return ad.missingInRepo
-}
-
-func main() {
-	ad := &ArchDiff{}
+func Main() error {
+	var ad ArchDiff
 	flag.BoolVar(&ad.Silent, "silent", false, "suppress errors")
 	flag.StringVar(&ad.Root, "root", "/", "set an alternate installation root")
 	flag.StringVar(
 		&ad.DB, "dbpath", "/var/lib/pacman", "set an alternate database location")
 	flag.StringVar(&ad.Repo, "repo", "/usr/share/archdiff", "repo directory")
-	flag.StringVar(&ad.IgnoreFile, "ignore", "/etc/archdiff/ignore", "ignore file")
-	flag.StringVar(&ad.CpuProfile, "cpuprofile", "", "write cpu profile to this file")
+	flag.StringVar(&ad.IgnoreDir, "ignore", "/etc/archdiff/ignore",
+		"directory of ignore files")
+	flag.StringVar(&ad.CpuProfile, "cpuprofile", "", "write cpu profile here")
 	flag.Parse()
 
 	if ad.CpuProfile != "" {
 		f, err := os.Create(ad.CpuProfile)
 		if err != nil {
-			log.Fatal(err)
+			return errors.WithStack(err)
 		}
 		defer f.Close()
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
 	}
 
-	files := ad.MissingInRepo()
-	files.Append(ad.DiffRepoFile())
-	for _, file := range files.Sorted() {
-		fmt.Printf("/%s\n", file.Name)
+	steps := []func() error{
+		ad.initAlpm,
+		ad.buildIgnoreGlob,
+		ad.buildAllFile,
+		ad.buildPackageFile,
+		ad.buildBackupFile,
+		ad.buildRepoFile,
+		ad.buildUnpackagedFile,
+		ad.buildModifiedBackupFile,
+		ad.buildDiffRepoFile,
+	}
+	for _, step := range steps {
+		if err := step(); err != nil {
+			return err
+		}
+	}
+
+	diff := make([]string, 0,
+		len(ad.unpackagedFile)+len(ad.diffRepoFile)+len(ad.modifiedBackupFile))
+	diff = append(diff, ad.unpackagedFile...)
+	diff = append(diff, ad.diffRepoFile...)
+	diff = append(diff, ad.modifiedBackupFile...)
+	sort.Strings(diff)
+
+	for _, file := range diff {
+		fmt.Println(file)
+	}
+
+	return nil
+}
+
+func main() {
+	if err := Main(); err != nil {
+		fmt.Fprintf(os.Stderr, "%+v", err)
+		os.Exit(1)
 	}
 }
