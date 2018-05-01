@@ -22,7 +22,6 @@ import (
 	"strings"
 
 	"github.com/daaku/go.alpm"
-	"github.com/facebookgo/flagconfig"
 )
 
 type File struct {
@@ -386,7 +385,6 @@ func main() {
 	flag.StringVar(&ad.IgnoreFile, "ignore", "/etc/archdiff/ignore", "ignore file")
 	flag.StringVar(&ad.CpuProfile, "cpuprofile", "", "write cpu profile to this file")
 	flag.Parse()
-	flagconfig.Parse()
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	if ad.CpuProfile != "" {
