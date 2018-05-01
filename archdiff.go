@@ -16,7 +16,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"runtime/pprof"
 	"sort"
 	"strings"
@@ -44,7 +43,6 @@ type ArchDiff struct {
 	DB         string
 	Repo       string
 	IgnoreFile string
-	MaxProcs   int
 	CpuProfile string
 
 	ignoreGlob         []Glob
@@ -376,7 +374,6 @@ func (ad *ArchDiff) MissingInRepo() FileList {
 
 func main() {
 	ad := &ArchDiff{}
-	flag.IntVar(&ad.MaxProcs, "max-procs", runtime.NumCPU()*2, "go max procs")
 	flag.BoolVar(&ad.Silent, "silent", false, "suppress errors")
 	flag.StringVar(&ad.Root, "root", "/", "set an alternate installation root")
 	flag.StringVar(
@@ -396,8 +393,6 @@ func main() {
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
 	}
-
-	runtime.GOMAXPROCS(ad.MaxProcs)
 
 	files := ad.MissingInRepo()
 	files.Append(ad.DiffRepoFile())
