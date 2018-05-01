@@ -117,7 +117,7 @@ func (ad *ArchDiff) buildIgnoreGlob() error {
 	))
 }
 
-func (ad *ArchDiff) IsIgnored(path string) bool {
+func (ad *ArchDiff) isIgnored(path string) bool {
 	for _, glob := range ad.ignoreGlob {
 		if glob.Match(path) {
 			return true
@@ -143,7 +143,7 @@ func (ad *ArchDiff) buildAllFile() error {
 			if err != nil {
 				return errors.WithStack(err)
 			}
-			if ad.IsIgnored(path) {
+			if ad.isIgnored(path) {
 				if info.IsDir() {
 					return filepath.SkipDir
 				}
@@ -211,7 +211,7 @@ func (ad *ArchDiff) buildModifiedBackupFile() error {
 			continue
 		}
 		fullname := filepath.Join(ad.Root, file)
-		if ad.IsIgnored(fullname) {
+		if ad.isIgnored(fullname) {
 			continue
 		}
 		if _, err := os.Stat(fullname); os.IsNotExist(err) {
