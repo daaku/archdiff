@@ -382,7 +382,6 @@ func main() {
 	flag.StringVar(&ad.IgnoreFile, "ignore", "/etc/archdiff/ignore", "ignore file")
 	flag.StringVar(&ad.CpuProfile, "cpuprofile", "", "write cpu profile to this file")
 	flag.Parse()
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
 	if ad.CpuProfile != "" {
 		f, err := os.Create(ad.CpuProfile)
