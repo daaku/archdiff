@@ -12,7 +12,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
@@ -59,7 +58,6 @@ func contains(a []string, x string) bool {
 }
 
 type ArchDiff struct {
-	Silent     bool
 	Root       string
 	DB         string
 	Repo       string
@@ -143,12 +141,6 @@ func (ad *ArchDiff) buildAllFile() error {
 		ad.Root,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				if os.IsPermission(err) {
-					if !ad.Silent {
-						log.Printf("Skipping file: %s", err)
-					}
-					return nil
-				}
 				return errors.WithStack(err)
 			}
 			if ad.IsIgnored(path) {
@@ -191,9 +183,6 @@ func (ad *ArchDiff) buildRepoFile() error {
 	err := filepath.Walk(ad.Repo,
 		func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				if !ad.Silent {
-					log.Printf("RepoFile Walk error: %s", err)
-				}
 				return nil
 			}
 			if info.IsDir() {
@@ -230,12 +219,6 @@ func (ad *ArchDiff) buildModifiedBackupFile() error {
 		}
 		actual, err := filehash(fullname)
 		if err != nil {
-			if os.IsPermission(errors.Cause(err)) {
-				if !ad.Silent {
-					log.Printf("Skipping file: %s", err)
-				}
-				continue
-			}
 			return errors.WithStack(err)
 		}
 		if actual != hash {
@@ -251,22 +234,10 @@ func (ad *ArchDiff) buildDiffRepoFile() error {
 		repopath := filepath.Join(ad.Repo, file)
 		realhash, err := filehash(realpath)
 		if err != nil && !os.IsNotExist(err) {
-			if os.IsPermission(err) {
-				if !ad.Silent {
-					log.Printf("Skipping file: %s", err)
-				}
-				continue
-			}
 			return errors.WithStack(err)
 		}
 		repohash, err := filehash(repopath)
 		if err != nil && !os.IsNotExist(err) {
-			if os.IsPermission(err) {
-				if !ad.Silent {
-					log.Printf("Skipping file: %s", err)
-				}
-				continue
-			}
 			return errors.WithStack(err)
 		}
 		if realhash != repohash {
@@ -278,7 +249,6 @@ func (ad *ArchDiff) buildDiffRepoFile() error {
 
 func Main() error {
 	var ad ArchDiff
-	flag.BoolVar(&ad.Silent, "silent", false, "suppress errors")
 	flag.StringVar(&ad.Root, "root", "/", "set an alternate installation root")
 	flag.StringVar(
 		&ad.DB, "dbpath", "/var/lib/pacman", "set an alternate database location")
