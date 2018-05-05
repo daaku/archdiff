@@ -74,7 +74,7 @@ type App struct {
 	repoFile           []string
 	modifiedBackupFile []string
 	unpackagedFile     []string
-	diffRepoFile       []string
+	modifiedRepoFile   []string
 }
 
 func (a *App) buildIgnoreGlob() error {
@@ -228,7 +228,7 @@ func (a *App) buildModifiedBackupFile() error {
 	return nil
 }
 
-func (a *App) buildDiffRepoFile() error {
+func (a *App) buildModifiedRepoFile() error {
 	for _, file := range a.repoFile {
 		realpath := filepath.Join(a.Root, file)
 		repopath := filepath.Join(a.Repo, file)
@@ -241,7 +241,7 @@ func (a *App) buildDiffRepoFile() error {
 			return errors.WithStack(err)
 		}
 		if realhash != repohash {
-			a.diffRepoFile = append(a.diffRepoFile, file)
+			a.modifiedRepoFile = append(a.modifiedRepoFile, file)
 		}
 	}
 	return nil
@@ -277,7 +277,7 @@ func Main() error {
 		app.buildRepoFile,
 		app.buildUnpackagedFile,
 		app.buildModifiedBackupFile,
-		app.buildDiffRepoFile,
+		app.buildModifiedRepoFile,
 	}
 	for _, step := range steps {
 		if err := step(); err != nil {
@@ -286,9 +286,11 @@ func Main() error {
 	}
 
 	diff := make([]string, 0,
-		len(app.unpackagedFile)+len(app.diffRepoFile)+len(app.modifiedBackupFile))
+		len(app.unpackagedFile)+
+			len(app.modifiedRepoFile)+
+			len(app.modifiedBackupFile))
 	diff = append(diff, app.unpackagedFile...)
-	diff = append(diff, app.diffRepoFile...)
+	diff = append(diff, app.modifiedRepoFile...)
 	diff = append(diff, app.modifiedBackupFile...)
 	sort.Strings(diff)
 
