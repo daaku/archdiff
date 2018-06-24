@@ -18,7 +18,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/daaku/go.alpm"
+	"github.com/Jguer/go-alpm"
 	"github.com/gobwas/glob"
 	"github.com/pkg/errors"
 )
