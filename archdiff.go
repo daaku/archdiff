@@ -64,7 +64,7 @@ type App struct {
 	IgnoreDir  string
 	CpuProfile string
 
-	localDB *alpm.Db
+	localDB *alpm.DB
 	alpm    *alpm.Handle
 
 	ignoreGlob         []Glob
@@ -128,11 +128,11 @@ func (a *App) isIgnored(path string) bool {
 
 func (a *App) initAlpm() error {
 	var err error
-	a.alpm, err = alpm.Init(a.Root, a.DB)
+	a.alpm, err = alpm.Initialize(a.Root, a.DB)
 	if err != nil {
 		return errors.WithStack(err)
 	}
-	a.localDB, err = a.alpm.LocalDb()
+	a.localDB, err = a.alpm.LocalDB()
 	return errors.WithStack(err)
 }
 
