@@ -1,0 +1,6 @@
+github.com/Jguer/go-alpm v0.0.0-20191122171459-5cffc6e8fc69 h1:eNGutt8eUr37crjH7Wpvg5rTNk71hoBEXUpyJA0oheU=
+github.com/Jguer/go-alpm v0.0.0-20191122171459-5cffc6e8fc69/go.mod h1:D5SUcIS9Yiz/L8cjRzq/992eERnx6ugYmGlc4e7xdus=
+github.com/gobwas/glob v0.2.3 h1:A4xDbljILXROh+kObIiy5kIaPYD8e96x1tgBhUI5J+Y=
+github.com/gobwas/glob v0.2.3/go.mod h1:d3Ez4x06l9bZtSvzIay5+Yzi0fmZzPgnTbPcKjJAkT8=
+github.com/pkg/errors v0.8.1 h1:iURUrRGxPUNPdy5/HRSm+Yj6okJ6UtLINN0Q9M4+h3I=
+github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
