@@ -1,4 +1,1 @@
-*.xz
-/archdiff
-/pkg/
-/src/
+/target
