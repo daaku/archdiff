@@ -8,7 +8,7 @@ use std::fmt::Display;
 use structopt::StructOpt;
 use walkdir::WalkDir;
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt)]
 #[structopt(name = "colaz")]
 struct Args {
     #[structopt(long, help = "root dir", default_value = "/")]
