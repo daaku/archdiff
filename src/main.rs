@@ -11,34 +11,13 @@ use walkdir::WalkDir;
 #[derive(StructOpt, Debug)]
 #[structopt(name = "colaz")]
 struct Args {
-    #[structopt(
-        long,
-        short,
-        help = "set an alternate installation root",
-        default_value = "/"
-    )]
+    #[structopt(long, help = "root dir", default_value = "/")]
     root: String,
-
-    #[structopt(
-        long,
-        short = "b",
-        help = "set an alternate database location",
-        default_value = "/var/lib/pacman"
-    )]
+    #[structopt(long, help = "database dir", default_value = "/var/lib/pacman")]
     dbpath: String,
-
-    #[structopt(
-        long,
-        help = "set repo directory",
-        default_value = "/usr/share/archdiff"
-    )]
+    #[structopt(long, help = "repo dir", default_value = "/usr/share/archdiff")]
     repo: String,
-
-    #[structopt(
-        long,
-        help = "set ignore directory",
-        default_value = "/etc/archdiff/ignore"
-    )]
+    #[structopt(long, help = "ignore dir", default_value = "/etc/archdiff/ignore")]
     ignore: String,
 }
 
