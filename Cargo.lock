@@ -11,8 +11,8 @@ dependencies = [
 
 [[package]]
 name = "alpm"
-version = "1.1.0"
-source = "git+https://github.com/Morganamilo/alpm.rs#ff42a810bd35659dd9c027302a941d4604d4e45a"
+version = "1.1.1"
+source = "git+https://github.com/Morganamilo/alpm.rs#836230251f6085468cb4592109420f87b7335064"
 dependencies = [
  "alpm-sys",
  "bitflags",
@@ -21,7 +21,7 @@ dependencies = [
 [[package]]
 name = "alpm-sys"
 version = "1.1.1"
-source = "git+https://github.com/Morganamilo/alpm.rs#ff42a810bd35659dd9c027302a941d4604d4e45a"
+source = "git+https://github.com/Morganamilo/alpm.rs#836230251f6085468cb4592109420f87b7335064"
 
 [[package]]
 name = "ansi_term"
