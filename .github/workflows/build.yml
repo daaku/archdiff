@@ -9,9 +9,7 @@ jobs:
     steps:
     - uses: hecrj/setup-rust-action@v1
     - uses: actions/checkout@v1
-    - name: Build
-      run: cargo build
+    - name: Check
+      run: cargo check
     - name: Clippy
       run: cargo clippy
-    - name: Test
-      run: cargo test
