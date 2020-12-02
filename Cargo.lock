@@ -11,9 +11,9 @@ dependencies = [
 
 [[package]]
 name = "alpm"
-version = "1.1.4"
+version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8570c4cdf945380d6b2b9d0aebc6f352db17873586cc0633f9ef4872c8335a10"
+checksum = "b986aa670b55de64a141b3e9fe8e4adc80eae4d74c29dfb4211a6a2c1fe5f599"
 dependencies = [
  "alpm-sys",
  "bitflags",
