@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use log::error;
 use rayon::prelude::*;
@@ -73,7 +73,8 @@ impl App {
 
     fn build_gitignore(ignore: &str) -> Result<Gitignore> {
         let mut gi_builder = GitignoreBuilder::new("/");
-        let ignores = std::fs::read_dir(ignore)?;
+        let ignores = std::fs::read_dir(ignore)
+            .with_context(|| format!("failed to read directory {}", ignore))?;
         for path in ignores {
             let path = path?;
             let oerr = gi_builder.add(path.path());
@@ -152,7 +153,7 @@ impl App {
             if ignored.matched(&fp, false).is_ignore() {
                 None
             } else {
-                match std::fs::metadata(&fp) {
+                match std::fs::metadata(&fp).with_context(|| format!("failed to stat {}", fp)) {
                     Err(_) => Some(('D', p)),
                     Ok(_) => None,
                 }
