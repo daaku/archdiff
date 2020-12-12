@@ -88,14 +88,14 @@ impl App {
     fn run(&self) {
         let mut pkg_files = HashSet::new();
         let mut pkg_backup_files = HashMap::new();
-        self.alpm.localdb().pkgs().into_iter().for_each(|pkg| {
-            pkg.files().files().iter().for_each(|f| {
-                pkg_files.insert(f.name().to_owned());
-            });
-            pkg.backup().into_iter().for_each(|bk| {
-                pkg_backup_files.insert(bk.name().to_owned(), bk.hash().to_owned());
-            });
-        });
+        for pkg in self.alpm.localdb().pkgs() {
+            pkg_files.extend(pkg.files().files().iter().map(|f| f.name().to_string()));
+            pkg_backup_files.extend(
+                pkg.backup()
+                    .iter()
+                    .map(|b| (b.name().to_string(), b.hash().to_string())),
+            );
+        }
 
         let root = &self.args.root;
         let ignored = &self.ignore;
