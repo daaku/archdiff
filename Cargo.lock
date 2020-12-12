@@ -51,7 +51,6 @@ dependencies = [
  "pretty_env_logger",
  "rayon",
  "structopt",
- "structopt-derive",
  "walkdir",
 ]
 
