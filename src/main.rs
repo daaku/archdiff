@@ -67,7 +67,7 @@ impl App {
         Ok(Self {
             alpm: alpm::Alpm::new(args.root.as_bytes(), args.dbpath.as_bytes())?,
             ignore: Self::build_gitignore(&args.ignore)?,
-            args: args,
+            args,
         })
     }
 
@@ -85,11 +85,11 @@ impl App {
         Ok(gi_builder.build()?)
     }
 
-    fn run(&self) -> Result<()> {
+    fn run(&self) {
         let mut pkg_files = HashSet::new();
         let mut pkg_backup_files = HashMap::new();
         self.alpm.localdb().pkgs().into_iter().for_each(|pkg| {
-            pkg.files().files().into_iter().for_each(|f| {
+            pkg.files().files().iter().for_each(|f| {
                 pkg_files.insert(f.name().to_owned());
             });
             pkg.backup().into_iter().for_each(|bk| {
@@ -169,7 +169,7 @@ impl App {
                     if ignored.matched_path_or_any_parents(&fp, false).is_ignore() {
                         None
                     } else {
-                        hash_file_logged(&fp).map_or(None, |actual_hash| {
+                        hash_file_logged(&fp).and_then(|actual_hash| {
                             if expected_hash == actual_hash {
                                 None
                             } else {
@@ -183,12 +183,11 @@ impl App {
         all.sort_by(|(_, a), (_, b)| a.cmp(b));
         all.iter()
             .for_each(|(c, n)| println!("{} {}{}", c, &root, n));
-        Ok(())
     }
 }
 
 fn main() -> Result<()> {
     pretty_env_logger::init();
-    App::new(Args::from_args())?.run()?;
+    App::new(Args::from_args())?.run();
     Ok(())
 }
