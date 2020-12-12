@@ -1,10 +1,10 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use log::error;
-use md5::Digest;
 use rayon::prelude::*;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
+use std::os::unix::ffi::OsStrExt;
 use structopt::StructOpt;
 use walkdir::WalkDir;
 
@@ -28,10 +28,9 @@ struct App {
 }
 
 fn hash_file<P: AsRef<std::path::Path>>(path: P) -> Result<String> {
-    let mut file = std::fs::File::open(path)?;
-    let mut hasher = md5::Md5::new();
-    std::io::copy(&mut file, &mut hasher)?;
-    Ok(format!("{:x}", hasher.finalize()))
+    let hash = alpm::compute_md5sum(path.as_ref().as_os_str().as_bytes())
+        .map_err(|_| anyhow!("failed to hash {}", path.as_ref().display()))?;
+    Ok(hash)
 }
 
 fn hash_file_logged<P: AsRef<std::path::Path>>(path: P) -> Option<String> {
