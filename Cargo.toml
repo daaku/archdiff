@@ -5,7 +5,7 @@ authors = ["Naitik Shah <n@daaku.org>"]
 edition = "2018"
 
 [dependencies]
-alpm = "1.1.7"
+alpm = "1.1.8"
 anyhow = "1.0"
 ignore = "0.4"
 log = "0.4"
