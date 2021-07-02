@@ -11,9 +11,9 @@ dependencies = [
 
 [[package]]
 name = "alpm"
-version = "2.0.5"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68ee937eb03e5b8cb3388efd2e12df2640ed1d1fbd43073bb48be79a726548e2"
+checksum = "fb56c7e8cb05fcc3d089ae26c14a5f44902877cb23bdc76fffd04e17c4985de0"
 dependencies = [
  "alpm-sys",
  "bitflags",
@@ -21,9 +21,12 @@ dependencies = [
 
 [[package]]
 name = "alpm-sys"
-version = "2.0.0"
+version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bc975d7c0bc845e5206599b1df8a35141d0215384cf654edc449ed5bc0a2a36"
+checksum = "d8edc7df020c1709861e4022ce953e6b7bfa4c85af150e3d4bbd51c7983f5744"
+dependencies = [
+ "pkg-config",
+]
 
 [[package]]
 name = "ansi_term"
@@ -285,6 +288,12 @@ name = "once_cell"
 version = "1.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "af8b08b04175473088b46763e51ee54da5f9a164bc162f615b91bc179dbf15a3"
+
+[[package]]
+name = "pkg-config"
+version = "0.3.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3831453b3449ceb48b6d9c7ad7c96d5ea673e9b470a1dc578c2ce6521230884c"
 
 [[package]]
 name = "pretty_env_logger"
