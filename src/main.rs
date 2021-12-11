@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use log::error;
-use rayon::prelude::*;
+use rayon::iter::{ParallelExtend, IntoParallelIterator, ParallelIterator};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::os::unix::ffi::OsStrExt;
