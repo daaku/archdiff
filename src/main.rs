@@ -1,23 +1,23 @@
 use anyhow::{anyhow, Context, Result};
+use clap::Parser;
 use ignore::gitignore::{Gitignore, GitignoreBuilder};
 use log::error;
-use rayon::iter::{ParallelExtend, IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IntoParallelIterator, ParallelExtend, ParallelIterator};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::os::unix::ffi::OsStrExt;
-use structopt::StructOpt;
 use walkdir::WalkDir;
 
-#[derive(StructOpt)]
-#[structopt(name = "colaz")]
+#[derive(Parser)]
+#[clap(name = "colaz")]
 struct Args {
-    #[structopt(long, help = "root dir", default_value = "/")]
+    #[clap(long, help = "root dir", default_value = "/")]
     root: String,
-    #[structopt(long, help = "database dir", default_value = "/var/lib/pacman")]
+    #[clap(long, help = "database dir", default_value = "/var/lib/pacman")]
     dbpath: String,
-    #[structopt(long, help = "repo dir", default_value = "/usr/share/archdiff")]
+    #[clap(long, help = "repo dir", default_value = "/usr/share/archdiff")]
     repo: String,
-    #[structopt(long, help = "ignore dir", default_value = "/etc/archdiff/ignore")]
+    #[clap(long, help = "ignore dir", default_value = "/etc/archdiff/ignore")]
     ignore: String,
 }
 
@@ -188,6 +188,6 @@ impl App {
 
 fn main() -> Result<()> {
     pretty_env_logger::init();
-    App::new(Args::from_args())?.run();
+    App::new(Args::parse())?.run();
     Ok(())
 }
