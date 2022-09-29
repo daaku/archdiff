@@ -9,7 +9,7 @@ use std::os::unix::ffi::OsStrExt;
 use walkdir::WalkDir;
 
 #[derive(Parser)]
-#[command(name = "colaz")]
+#[command(name = "archdiff")]
 struct Args {
     #[arg(long, help = "root dir", default_value = "/")]
     root: String,
