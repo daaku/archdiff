@@ -9,15 +9,15 @@ use std::os::unix::ffi::OsStrExt;
 use walkdir::WalkDir;
 
 #[derive(Parser)]
-#[clap(name = "colaz")]
+#[command(name = "colaz")]
 struct Args {
-    #[clap(long, help = "root dir", default_value = "/")]
+    #[arg(long, help = "root dir", default_value = "/")]
     root: String,
-    #[clap(long, help = "database dir", default_value = "/var/lib/pacman")]
+    #[arg(long, help = "database dir", default_value = "/var/lib/pacman")]
     dbpath: String,
-    #[clap(long, help = "repo dir", default_value = "/usr/share/archdiff")]
+    #[arg(long, help = "repo dir", default_value = "/usr/share/archdiff")]
     repo: String,
-    #[clap(long, help = "ignore dir", default_value = "/etc/archdiff/ignore")]
+    #[arg(long, help = "ignore dir", default_value = "/etc/archdiff/ignore")]
     ignore: String,
 }
 
