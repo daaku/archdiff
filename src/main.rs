@@ -37,7 +37,9 @@ fn hash_file_logged<P: AsRef<std::path::Path>>(path: P) -> Option<String> {
     match hash_file(&path) {
         Ok(hash) => Some(hash),
         Err(err) => {
-            error!("IO error for operation on {:?}: {}", path.as_ref(), err);
+            if path.as_ref().exists() {
+                error!("IO error for operation on {:?}: {}", path.as_ref(), err);
+            }
             None
         }
     }
